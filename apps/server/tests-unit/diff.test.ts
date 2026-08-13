@@ -124,6 +124,29 @@ describe("diffSnapshots", () => {
     expect(groups[0].groupTitle).toBe("Availability");
   });
 
+  it("does not mismatch elements that share a non-identifying duplicate href (e.g. href=\"#\")", () => {
+    // Regression test: several nav links using the common placeholder href="#"
+    // must not get cross-matched with each other just because they share a key.
+    const before = snapshot([
+      section("Account", 0, [
+        el({ tag: "a", text: "Login", attributes: { href: "#" } }),
+        el({ tag: "a", text: "Orders", attributes: { href: "#" } }),
+        el({ tag: "a", text: "Wishlist", attributes: { href: "#" } }),
+        el({ tag: "a", text: "Cart", attributes: { href: "#" } }),
+      ]),
+    ]);
+    const after = snapshot([
+      section("Account", 0, [
+        el({ tag: "a", text: "Login", attributes: { href: "#" } }),
+        el({ tag: "a", text: "Orders", attributes: { href: "#" } }),
+        el({ tag: "a", text: "Wishlist", attributes: { href: "#" } }),
+        el({ tag: "a", text: "Cart", attributes: { href: "#" } }),
+      ]),
+    ]);
+
+    expect(diffSnapshots(before, after)).toHaveLength(0);
+  });
+
   it("matches an unchanged element (no diff) when nothing differs", () => {
     const before = snapshot([section("Pricing", 0, [el({ tag: "span", text: "₹49,999" })])]);
     const after = snapshot([section("Pricing", 0, [el({ tag: "span", text: "₹49,999" })])]);

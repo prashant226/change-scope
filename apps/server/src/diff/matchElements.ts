@@ -84,20 +84,26 @@ function matchByPredicate(
   pairs: ElementPair[],
   keyFn: (el: SnapshotElement) => string | null,
 ) {
-  const index = new Map<string, SnapshotElement>();
+  // Multiple elements can share the same key (e.g. several nav links all using
+  // the placeholder href="#") — queue same-key candidates in document order
+  // rather than overwriting, so a later duplicate doesn't silently steal an
+  // earlier one's match (see diff engine unit tests for the regression case).
+  const index = new Map<string, SnapshotElement[]>();
   for (const el of beforeRemaining) {
     const key = keyFn(el);
-    if (key) index.set(key, el);
+    if (!key) continue;
+    if (!index.has(key)) index.set(key, []);
+    index.get(key)!.push(el);
   }
   for (const el of [...afterRemaining]) {
     const key = keyFn(el);
     if (!key) continue;
-    const match = index.get(key);
+    const candidates = index.get(key);
+    const match = candidates?.shift();
     if (match) {
       pairs.push({ before: match, after: el });
       removeFrom(beforeRemaining, match);
       removeFrom(afterRemaining, el);
-      index.delete(key);
     }
   }
 }

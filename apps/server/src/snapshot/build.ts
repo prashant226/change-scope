@@ -26,7 +26,17 @@ function buildElement(
   // Fingerprint used for cross-snapshot matching includes content, so identical
   // elements collapse together while a changed value still lets the diff engine
   // find "the same slot" via section+tag+role+position (handled in the diff matcher).
-  const fp = fingerprint(raw.tag, raw.role, raw.attributes.href, raw.attributes.ariaLabel, normalized.slice(0, 40));
+  // For <img>, src is the primary identity signal (text/href are usually absent);
+  // without it, every image on a page collapses to one fingerprint and a carousel's
+  // shuffled DOM order gets misread as images "changing" into each other.
+  const fp = fingerprint(
+    raw.tag,
+    raw.role,
+    raw.attributes.href,
+    raw.attributes.ariaLabel,
+    raw.attributes.src,
+    normalized.slice(0, 40),
+  );
 
   return {
     id,

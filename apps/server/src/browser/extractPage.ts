@@ -88,9 +88,34 @@ export function extractPage(): RawExtractionResult {
   let current: RawExtractedSection = { heading: null, position: 0, elements: [] };
   sections.push(current);
 
+  // Many client-rendered nav/footer regions have no <h1-3> heading at all, so
+  // without this they'd all collapse into one shared "General" bucket — which
+  // makes element matching far more prone to false positives when their DOM
+  // order shifts slightly between two captures (see diff/matchElements.ts).
+  // Landmark tags give those regions their own stable section identity too.
+  function nearestLandmarkKey(el: Element): string | null {
+    const landmark = el.closest("nav, header, footer, aside, main");
+    if (!landmark) return null;
+    const label = landmark.getAttribute("aria-label");
+    return label ? `${landmark.tagName}:${label}` : landmark.tagName;
+  }
+
+  let currentLandmarkKey: string | null = null;
+
   for (const el of allEls) {
     if (!CONTENT_TAGS.has(el.tagName)) continue;
     if (!isVisible(el)) continue;
+
+    const landmarkKey = nearestLandmarkKey(el);
+    if (landmarkKey !== currentLandmarkKey) {
+      currentLandmarkKey = landmarkKey;
+      if (landmarkKey) {
+        const [tag, label] = landmarkKey.split(":");
+        const niceLabel = label || tag.charAt(0) + tag.slice(1).toLowerCase();
+        current = { heading: niceLabel, position: sections.length, elements: [] };
+        sections.push(current);
+      }
+    }
 
     if (SECTION_HEADING_TAGS.has(el.tagName)) {
       const headingText = (el.textContent || "").trim().slice(0, 200);

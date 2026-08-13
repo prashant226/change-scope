@@ -11,3 +11,4 @@ test-results/
 .vite/
 apps/web/dist/
 apps/server/dist/
+.claude/
