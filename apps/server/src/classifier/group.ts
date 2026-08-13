@@ -1,0 +1,29 @@
+/**
+ * Groups related raw changes into higher-level events (§51). Kept deterministic
+ * and simple: changes within the same section are grouped together so, e.g.,
+ * "In Stock → Out of Stock" + "Buy Now → Notify Me" surface as one
+ * "Availability" event instead of two disconnected diffs. AI may further
+ * refine grouping titles/semantics, but never invents the underlying facts.
+ */
+import type { ChangeGroup, RawChange } from "../types/change.js";
+import { fingerprint } from "../snapshot/fingerprint.js";
+
+export function groupChanges(changes: RawChange[]): ChangeGroup[] {
+  const bySection = new Map<string, RawChange[]>();
+  for (const change of changes) {
+    const key = change.section || "General";
+    if (!bySection.has(key)) bySection.set(key, []);
+    bySection.get(key)!.push(change);
+  }
+
+  const groups: ChangeGroup[] = [];
+  for (const [section, sectionChanges] of bySection) {
+    groups.push({
+      groupKey: fingerprint("group", section),
+      groupTitle: section,
+      section,
+      changes: sectionChanges,
+    });
+  }
+  return groups;
+}
