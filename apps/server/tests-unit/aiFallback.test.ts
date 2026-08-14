@@ -23,7 +23,15 @@ describe("AI reasoning fallback (§58)", () => {
 
     expect(result.aiUnavailable).toBe(true);
     expect(result.changes).toHaveLength(1);
+    // Cosmetic (visual) changes never reach reasonAboutChanges at all (see
+    // classifier/partition.ts) — anything here is a real candidate, so the
+    // fallback should never silently mark it not-meaningful.
+    expect(result.changes[0].meaningful).toBe(true);
+    expect(result.changes[0].needsReview).toBe(true);
     expect(result.changes[0].whyItMatters).toBe("AI significance analysis is temporarily unavailable.");
+    // The fallback still states the grounded fact even without AI.
+    expect(result.changes[0].whatChanged).toContain("₹49,999");
+    expect(result.changes[0].whatChanged).toContain("₹44,999");
     expect(result.changes[0].beforeValue).toBe("₹49,999");
     expect(result.changes[0].afterValue).toBe("₹44,999");
   });
@@ -41,21 +49,31 @@ describe("AI reasoning fallback (§58)", () => {
 });
 
 describe("AI response schema validation (§55)", () => {
+  const validChange = {
+    groupKey: "g1",
+    groupTitle: "Pricing",
+    meaningful: true,
+    significance: "high",
+    whatChanged: "The price decreased from ₹49,999 to ₹44,999.",
+    whyItMatters: "Price dropped ~10%.",
+    confidence: 0.9,
+  };
+
   it("accepts a well-formed response", () => {
-    const parsed = aiResponseSchema.safeParse({
-      changes: [
-        { groupKey: "g1", groupTitle: "Pricing", meaningful: true, significance: "high", confidence: 0.9, whyItMatters: "Price dropped ~10%." },
-      ],
-    });
+    const parsed = aiResponseSchema.safeParse({ changes: [validChange] });
     expect(parsed.success).toBe(true);
   });
 
   it("rejects a response with an invalid significance value", () => {
     const parsed = aiResponseSchema.safeParse({
-      changes: [
-        { groupKey: "g1", groupTitle: "Pricing", meaningful: true, significance: "extreme", confidence: 0.9, whyItMatters: "x" },
-      ],
+      changes: [{ ...validChange, significance: "extreme" }],
     });
+    expect(parsed.success).toBe(false);
+  });
+
+  it("rejects a response missing whatChanged", () => {
+    const { whatChanged, ...withoutWhatChanged } = validChange;
+    const parsed = aiResponseSchema.safeParse({ changes: [withoutWhatChanged] });
     expect(parsed.success).toBe(false);
   });
 

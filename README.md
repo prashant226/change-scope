@@ -106,7 +106,8 @@ npx playwright install chromium --with-deps   # from apps/server, or run once at
 2. In **Project Settings → API**, copy the **Project URL**, **anon public** key, and
    **service_role** key (click "Reveal").
 3. In the **SQL Editor**, run, in order: `supabase/migrations/0001_init.sql`,
-   `supabase/migrations/0002_tighten_user_fk.sql`, then `supabase/seed/storage_buckets.sql`.
+   `supabase/migrations/0002_tighten_user_fk.sql`, `supabase/migrations/0003_add_what_changed.sql`,
+   then `supabase/seed/storage_buckets.sql`.
 4. Put the three keys into `apps/server/.env` (see below) **and** the URL + anon key into
    `apps/web/.env` as `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` (safe to expose client-side —
    see `apps/web/.env.example`).

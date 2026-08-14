@@ -46,7 +46,11 @@ export interface AnalyzedChange {
   afterValue?: string;
   meaningful: boolean;
   significance: Significance;
-  confidence: number;
+  /** One grounded factual sentence: what changed. Kept separate from whyItMatters (interpretation). */
+  whatChanged: string;
   whyItMatters: string;
+  confidence: number;
+  /** True when AI confidence was too low to present the interpretation with certainty — UI shows "Needs review" instead of manufacturing confidence. */
+  needsReview: boolean;
   evidence?: Record<string, unknown>;
 }

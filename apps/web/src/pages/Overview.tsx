@@ -4,6 +4,7 @@ import { api } from "../lib/api";
 import { useRun } from "../hooks/useRun";
 import { AgentTrail } from "../components/AgentTrail";
 import { ChangeCard } from "../components/ChangeCard";
+import { ReportSummary } from "../components/ReportSummary";
 import { PageHeader } from "../components/PageHeader";
 import { groupByKey } from "../lib/groupChanges";
 import { downloadReportPdf } from "../lib/downloadPdf";
@@ -140,21 +141,23 @@ export function Overview() {
       )}
 
       {changes && changes.meaningful.length > 0 && (
-        <section className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-[15px] font-semibold text-ink">Meaningful changes</h2>
+        <section>
+          <div className="flex items-start justify-between gap-4">
+            <ReportSummary meaningful={changes.meaningful} cosmeticCount={changes.cosmetic.length} />
             <button
               onClick={handleDownloadPdf}
               disabled={downloadingPdf}
-              className="flex items-center gap-1.5 text-sm font-medium text-primary hover:underline disabled:opacity-50"
+              className="flex items-center gap-1.5 text-sm font-medium text-primary hover:underline disabled:opacity-50 shrink-0 mt-1"
             >
               <Download className="h-3.5 w-3.5" />
               {downloadingPdf ? "Preparing PDF…" : "Download PDF"}
             </button>
           </div>
-          {groupByKey(changes.meaningful).map((group) => (
-            <ChangeCard key={group[0].groupKey} changes={group} />
-          ))}
+          <div className="space-y-4">
+            {groupByKey(changes.meaningful).map((group) => (
+              <ChangeCard key={group[0].groupKey} changes={group} />
+            ))}
+          </div>
         </section>
       )}
 

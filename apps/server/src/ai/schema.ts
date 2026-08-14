@@ -3,11 +3,15 @@ import { z } from "zod";
 /** Strict schema for the AI's response — never trust free-form output (§55). */
 export const aiChangeSchema = z.object({
   groupKey: z.string(),
+  /** A concise, human-meaningful business/content name for this event (e.g. "Pricing", "Availability") — not the raw DOM/container label it was given. */
   groupTitle: z.string(),
   meaningful: z.boolean(),
   significance: z.enum(["high", "medium", "low"]),
-  confidence: z.number().min(0).max(1),
+  /** One grounded, factual sentence describing what changed — no interpretation. */
+  whatChanged: z.string(),
+  /** One grounded, hedged sentence on why it might matter — interpretation, not invented causes. */
   whyItMatters: z.string(),
+  confidence: z.number().min(0).max(1),
 });
 
 export const aiResponseSchema = z.object({
@@ -29,10 +33,11 @@ export const aiJsonSchema = {
           groupTitle: { type: "string" },
           meaningful: { type: "boolean" },
           significance: { type: "string", enum: ["high", "medium", "low"] },
-          confidence: { type: "number" },
+          whatChanged: { type: "string" },
           whyItMatters: { type: "string" },
+          confidence: { type: "number" },
         },
-        required: ["groupKey", "groupTitle", "meaningful", "significance", "confidence", "whyItMatters"],
+        required: ["groupKey", "groupTitle", "meaningful", "significance", "whatChanged", "whyItMatters", "confidence"],
         additionalProperties: false,
       },
     },

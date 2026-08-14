@@ -9,7 +9,10 @@ import { capturePage } from "../browser/capture.js";
 import { buildSnapshot } from "../snapshot/build.js";
 import { diffSnapshots } from "../diff/engine.js";
 import { groupChanges } from "../classifier/group.js";
+import { partitionChanges } from "../classifier/partition.js";
+import { buildCosmeticChanges } from "../classifier/buildCosmeticChanges.js";
 import { reasonAboutChanges } from "../ai/reason.js";
+import { countGroups } from "../reports/countGroups.js";
 import { getStore } from "../storage/index.js";
 import type { AgentLogEntry, RunStage } from "../types/run.js";
 import { config } from "../utils/config.js";
@@ -133,11 +136,21 @@ export async function executeRun(runId: string): Promise<void> {
     const rawChanges = diffSnapshots(previousSnapshot.snapshot, snapshotData);
     await logger.log("comparing", "Comparison complete", `Found ${rawChanges.length} raw difference(s).`, "completed");
 
-    await logger.log("classifying", "Changes classified", "Separating content, functional, structural, visual and media differences.", "completed");
+    await logger.log(
+      "classifying",
+      "Changes classified",
+      "Separating content, functional, structural, visual and media differences.",
+      "completed",
+    );
+
+    // CSS-only changes are pulled out here, before grouping — they're not
+    // ambiguous, so they never enter AI reasoning or share a group with a
+    // real content change from the same section (§9-10).
+    const { candidates, cosmetic } = partitionChanges(rawChanges);
 
     await logger.log("grouping", "Grouping related changes", "Clustering low-level differences into higher-level events by section.", "in_progress");
-    const groups = groupChanges(rawChanges);
-    await logger.log("grouping", "Grouping complete", `Formed ${groups.length} change group(s).`, "completed");
+    const groups = groupChanges(candidates);
+    await logger.log("grouping", "Grouping complete", `Formed ${groups.length} change group(s), plus ${cosmetic.length} cosmetic change(s) set aside.`, "completed");
 
     await logger.log("ai_reasoning", "AI analysis started", "Interpreting ambiguous changes and their potential significance.", "in_progress");
     const reasonResult = await reasonAboutChanges(groups, snapshotData.metadata.title, {
@@ -156,9 +169,10 @@ export async function executeRun(runId: string): Promise<void> {
     );
 
     await logger.log("building_report", "Report generated", "Converting analyzed changes into the final user-facing report.", "in_progress");
-    await store.saveChanges(runId, reasonResult.changes);
-    const meaningfulCount = reasonResult.changes.filter((c) => c.meaningful).length;
-    const cosmeticCount = reasonResult.changes.length - meaningfulCount;
+    const allChanges = [...reasonResult.changes, ...buildCosmeticChanges(cosmetic)];
+    await store.saveChanges(runId, allChanges);
+
+    const { meaningful: meaningfulCount, cosmetic: cosmeticCount } = countGroups(allChanges);
     await logger.log("building_report", "Report ready", `${meaningfulCount} meaningful change(s), ${cosmeticCount} cosmetic change(s) excluded from the summary.`, "completed");
 
     await store.updateRun(runId, {

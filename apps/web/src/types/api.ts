@@ -42,8 +42,9 @@ export interface AnalyzedChange {
   afterValue?: string;
   meaningful: boolean;
   significance: "high" | "medium" | "low";
-  confidence: number;
+  whatChanged: string;
   whyItMatters: string;
+  needsReview: boolean;
 }
 
 export interface MonitorRecord {

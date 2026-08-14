@@ -1,16 +1,18 @@
 /**
  * Builds a self-contained HTML report — printed to PDF via Playwright
  * (reports/renderPdf.ts). Deliberately plain inline CSS only; this is never
- * shipped to a browser as a page, just rendered headlessly.
+ * shipped to a browser as a page, just rendered headlessly. Mirrors the web
+ * report's structure exactly: summary header, then Section · Impact /
+ * What changed / Before / Now / Why it might matter per meaningful group.
  */
 import type { AnalyzedChange } from "../types/change.js";
 import type { MonitorRecord, RunRecord } from "../storage/types.js";
 import { groupByKey } from "./groupAnalyzedChanges.js";
 
-const IMPACT_STYLES: Record<AnalyzedChange["significance"], { label: string; color: string; bg: string }> = {
-  high: { label: "High Impact", color: "#DC2626", bg: "#FEF2F2" },
-  medium: { label: "Medium Impact", color: "#D97706", bg: "#FFFBEB" },
-  low: { label: "Low Impact", color: "#16A34A", bg: "#F0FDF4" },
+const IMPACT_STYLES: Record<AnalyzedChange["significance"], { label: string; color: string }> = {
+  high: { label: "High Impact", color: "#DC2626" },
+  medium: { label: "Medium Impact", color: "#D97706" },
+  low: { label: "Low Impact", color: "#16A34A" },
 };
 
 function esc(value: string | undefined): string {
@@ -38,8 +40,8 @@ function renderGroup(group: AnalyzedChange[]): string {
           <p style="font-size:13px;color:#111827;margin:0;">${esc(c.beforeValue) || "—"}</p>
         </div>
         <div style="flex:1;">
-          <p style="font-size:10px;text-transform:uppercase;letter-spacing:0.04em;color:#64748B;margin:0 0 2px;">Now</p>
-          <p style="font-size:13px;color:#111827;margin:0;">${esc(c.afterValue) || "—"}</p>
+          <p style="font-size:10px;text-transform:uppercase;letter-spacing:0.04em;color:#2563EB;margin:0 0 2px;">Now</p>
+          <p style="font-size:13px;color:#111827;font-weight:600;margin:0;">${esc(c.afterValue) || "—"}</p>
         </div>
       </div>`,
     )
@@ -47,11 +49,14 @@ function renderGroup(group: AnalyzedChange[]): string {
 
   return `
     <article style="border:1px solid #E5E7EB; border-radius:8px; padding:16px; margin-bottom:12px; page-break-inside:avoid;">
-      <div style="margin-bottom:8px;">
-        <span style="font-size:11px; font-weight:600; padding:2px 8px; border-radius:4px; color:${impact.color}; background:${impact.bg}; border:1px solid ${impact.color}33;">${impact.label}</span>
-        <span style="font-size:11px; color:#64748B; margin-left:8px;">${esc(first.section) || "General"}</span>
+      <div style="margin-bottom:10px;">
+        <span style="font-size:15px; font-weight:600; color:#111827;">${esc(first.groupTitle)}</span>
+        <span style="font-size:14px; color:#64748B;"> · </span>
+        <span style="font-size:14px; font-weight:600; color:${impact.color};">${impact.label}</span>
+        ${first.needsReview ? `<span style="font-size:10px; font-weight:600; color:#64748B; border:1px solid #E5E7EB; border-radius:4px; padding:1px 6px; margin-left:8px;">Needs review</span>` : ""}
       </div>
-      <h3 style="font-size:15px; font-weight:600; color:#111827; margin:0 0 10px;">${esc(first.groupTitle)}</h3>
+      <p style="font-size:10px;text-transform:uppercase;letter-spacing:0.04em;color:#64748B;margin:0 0 3px;">What changed</p>
+      <p style="font-size:13px;color:#111827;margin:0 0 12px;">${esc(first.whatChanged)}</p>
       ${rows}
       <div style="background:#F8FAFC; border-radius:6px; padding:10px 12px; margin-top:8px;">
         <p style="font-size:10px;text-transform:uppercase;letter-spacing:0.04em;color:#64748B;margin:0 0 4px;">Why it might be significant</p>
@@ -68,6 +73,21 @@ export function buildReportHtml(
 ): string {
   const groups = groupByKey(meaningful);
   const isBaseline = !run.previousSnapshotId;
+
+  const impactCounts: Record<AnalyzedChange["significance"], number> = { high: 0, medium: 0, low: 0 };
+  for (const g of groups) impactCounts[g[0].significance]++;
+  const impactSummary = (["high", "medium", "low"] as const)
+    .filter((sig) => impactCounts[sig] > 0)
+    .map((sig) => `${impactCounts[sig]} ${IMPACT_STYLES[sig].label}`)
+    .join(" · ");
+
+  const summaryHtml = isBaseline
+    ? ""
+    : `<div style="margin-bottom:20px;">
+         <h2 style="font-size:17px; color:#111827; margin:0 0 4px;">${groups.length} meaningful change${groups.length === 1 ? "" : "s"} detected</h2>
+         ${impactSummary ? `<p style="font-size:12px; color:#64748B; margin:0 0 2px;">${esc(impactSummary)}</p>` : ""}
+         ${cosmetic.length > 0 ? `<p style="font-size:12px; color:#64748B; margin:0;">${cosmetic.length} cosmetic change${cosmetic.length === 1 ? "" : "s"} excluded</p>` : ""}
+       </div>`;
 
   const body = isBaseline
     ? `<div style="border:1px solid #E5E7EB; border-radius:8px; padding:20px;">
@@ -111,11 +131,11 @@ export function buildReportHtml(
   </div>
   <h1 style="font-size:20px; margin:12px 0 2px;">${esc(monitor.title) || esc(monitor.url)}</h1>
   <p style="font-size:12px; color:#64748B; margin:0 0 4px; word-break:break-all;">${esc(monitor.url)}</p>
-  <p style="font-size:12px; color:#64748B; margin:0 0 24px;">
+  <p style="font-size:12px; color:#64748B; margin:0 0 20px;">
     Snapshot captured ${formatDate(run.completedAt || run.startedAt)} · ${esc(run.triggerType)} run
-    ${!isBaseline ? ` · ${meaningful.length} meaningful change(s), ${cosmetic.length} cosmetic change(s)` : ""}
   </p>
 
+  ${summaryHtml}
   ${body}
   ${cosmeticHtml}
 

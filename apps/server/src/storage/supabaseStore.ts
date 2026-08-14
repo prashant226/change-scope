@@ -290,8 +290,10 @@ export class SupabaseStore implements StorageAdapter {
         after_value: c.afterValue,
         meaningful: c.meaningful,
         significance: c.significance,
+        what_changed: c.whatChanged,
         why_it_matters: c.whyItMatters,
         confidence: c.confidence,
+        needs_review: c.needsReview,
         evidence: c.evidence,
       })),
     );
@@ -313,8 +315,10 @@ export class SupabaseStore implements StorageAdapter {
         afterValue: row.after_value ?? undefined,
         meaningful: row.meaningful,
         significance: row.significance,
-        confidence: row.confidence ?? 0,
+        whatChanged: row.what_changed ?? "",
         whyItMatters: row.why_it_matters ?? "",
+        confidence: row.confidence ?? 0,
+        needsReview: row.needs_review ?? false,
         evidence: row.evidence ?? undefined,
       }),
     );

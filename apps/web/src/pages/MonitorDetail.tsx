@@ -5,6 +5,7 @@ import { api } from "../lib/api";
 import { useRun } from "../hooks/useRun";
 import { AgentTrail } from "../components/AgentTrail";
 import { ChangeCard } from "../components/ChangeCard";
+import { ReportSummary } from "../components/ReportSummary";
 import { groupByKey } from "../lib/groupChanges";
 import { SnapshotTimeline } from "../components/SnapshotTimeline";
 import { MonitorStatusBadge } from "../components/StatusBadge";
@@ -210,11 +211,12 @@ export function MonitorDetail() {
 
           {!isRunning && displayChanges && displayChanges.meaningful.length > 0 && (
             <>
-              <div className="flex justify-end mb-3">
+              <div className="flex items-start justify-between gap-4">
+                <ReportSummary meaningful={displayChanges.meaningful} cosmeticCount={displayChanges.cosmetic.length} />
                 <button
                   onClick={() => displayRun && handleDownloadPdf(displayRun.id)}
                   disabled={downloadingPdf}
-                  className="flex items-center gap-1.5 text-sm font-medium text-primary hover:underline disabled:opacity-50"
+                  className="flex items-center gap-1.5 text-sm font-medium text-primary hover:underline disabled:opacity-50 shrink-0 mt-1"
                 >
                   <Download className="h-3.5 w-3.5" />
                   {downloadingPdf ? "Preparing PDF…" : "Download PDF"}
