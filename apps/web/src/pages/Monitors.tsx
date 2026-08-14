@@ -4,7 +4,7 @@ import { Plus } from "lucide-react";
 import { api } from "../lib/api";
 import type { MonitorRecord } from "../types/api";
 import { MonitorStatusBadge, RunStatusBadge } from "../components/StatusBadge";
-import { relativeTime, FREQUENCY_LABELS } from "../lib/format";
+import { relativeTime, formatDateTime } from "../lib/format";
 import { CreateMonitorModal } from "../components/CreateMonitorModal";
 
 export function Monitors() {
@@ -61,7 +61,7 @@ export function Monitors() {
               <th className="px-4 py-3 font-medium">Status</th>
               <th className="px-4 py-3 font-medium">Last run</th>
               <th className="px-4 py-3 font-medium">Changes</th>
-              <th className="px-4 py-3 font-medium">Frequency</th>
+              <th className="px-4 py-3 font-medium">Next check</th>
               <th className="px-4 py-3 font-medium"></th>
             </tr>
           </thead>
@@ -91,7 +91,9 @@ export function Monitors() {
                 <td className="px-4 py-3 text-ink">
                   {m.latestMeaningfulChangeCount !== undefined ? `${m.latestMeaningfulChangeCount} change(s)` : "—"}
                 </td>
-                <td className="px-4 py-3 text-muted">{FREQUENCY_LABELS[m.scheduleFrequency] || m.scheduleFrequency}</td>
+                <td className="px-4 py-3 text-muted">
+                  {m.status === "paused" ? "Paused" : formatDateTime(m.nextRunAt)}
+                </td>
                 <td className="px-4 py-3 text-right whitespace-nowrap">
                   <button
                     onClick={() => navigate(`/monitors/${m.id}`)}

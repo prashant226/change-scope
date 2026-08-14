@@ -5,6 +5,7 @@ import routes from "./api/routes.js";
 import { requireAuth } from "./api/authMiddleware.js";
 import { config } from "./utils/config.js";
 import { closeBrowser } from "./browser/capture.js";
+import { startScheduler } from "./scheduler/index.js";
 
 const app = express();
 app.use(cors({ origin: config.frontendUrl }));
@@ -20,6 +21,7 @@ app.use((err: unknown, _req: express.Request, res: express.Response, _next: expr
 
 const server = app.listen(config.port, () => {
   console.log(`ChangeScope server listening on http://localhost:${config.port}`);
+  startScheduler();
 });
 
 async function shutdown() {

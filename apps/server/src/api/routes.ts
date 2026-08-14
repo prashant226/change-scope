@@ -2,10 +2,10 @@ import { Router } from "express";
 import { getStore } from "../storage/index.js";
 import { validateUrlSyntax } from "../browser/urlSafety.js";
 import { normalizeUrl } from "../utils/normalizeUrl.js";
-import { executeRun } from "../orchestrator/runOrchestrator.js";
-import { canStartRun, markRunStarted, markRunFinished } from "./rateLimit.js";
+import { triggerRun } from "../orchestrator/trigger.js";
 import { buildAnalytics } from "../reports/analytics.js";
 import { buildMonitorSummaries, buildMonitorSummary } from "../reports/monitorSummary.js";
+import { computeNextRunAt } from "../utils/schedule.js";
 import type { ScheduleFrequency } from "../storage/types.js";
 
 const router = Router();
@@ -16,30 +16,6 @@ async function getOwnedMonitor(userId: string, monitorId: string) {
   const monitor = await store.getMonitor(monitorId);
   if (!monitor || monitor.userId !== userId) return undefined;
   return monitor;
-}
-
-async function triggerRun(userId: string, monitorId: string, triggerType: "manual" | "scheduled") {
-  const gate = canStartRun(userId, monitorId);
-  if (!gate.ok) return { error: gate.reason };
-
-  const run = await store.createRun({
-    monitorId,
-    userId,
-    status: "queued",
-    triggerType,
-    meaningfulChangeCount: 0,
-    cosmeticChangeCount: 0,
-    aiStatus: "pending",
-    captureStatus: "pending",
-  });
-
-  markRunStarted(userId, monitorId);
-  // Fire-and-forget: the HTTP response returns immediately with the run id (§70).
-  executeRun(run.id)
-    .catch((err) => console.error("[api] executeRun crashed:", err))
-    .finally(() => markRunFinished(userId));
-
-  return { run };
 }
 
 // POST /api/monitors — create (or return existing) monitor for a URL.
@@ -57,12 +33,14 @@ router.post("/monitors", async (req, res) => {
     return res.status(200).json({ monitor: existing, alreadyMonitored: true });
   }
 
+  const frequency = scheduleFrequency || "every_6_hours";
   const monitor = await store.createMonitor({
     userId,
     url,
     normalizedUrl: normalized,
     status: "active",
-    scheduleFrequency: scheduleFrequency || "every_6_hours",
+    scheduleFrequency: frequency,
+    nextRunAt: computeNextRunAt(frequency),
   });
   return res.status(201).json({ monitor, alreadyMonitored: false });
 });
@@ -83,7 +61,17 @@ router.get("/monitors/:id", async (req, res) => {
 router.patch("/monitors/:id", async (req, res) => {
   const monitor = await getOwnedMonitor(req.userId, req.params.id);
   if (!monitor) return res.status(404).json({ error: "Monitor not found" });
-  const updated = await store.updateMonitor(req.params.id, req.body);
+
+  const patch = { ...req.body };
+  // Changing the frequency, or resuming a paused monitor, restarts the clock
+  // from now rather than waiting out whatever cadence was in effect before.
+  const frequencyChanged = patch.scheduleFrequency && patch.scheduleFrequency !== monitor.scheduleFrequency;
+  const resumed = patch.status === "active" && monitor.status === "paused";
+  if (frequencyChanged || resumed) {
+    patch.nextRunAt = computeNextRunAt(patch.scheduleFrequency || monitor.scheduleFrequency);
+  }
+
+  const updated = await store.updateMonitor(req.params.id, patch);
   res.json({ monitor: updated });
 });
 
@@ -125,6 +113,7 @@ router.post("/runs", async (req, res) => {
   if (!monitor) {
     monitor = await store.createMonitor({
       userId, url, normalizedUrl: normalized, status: "active", scheduleFrequency: "every_6_hours",
+      nextRunAt: computeNextRunAt("every_6_hours"),
     });
   }
 

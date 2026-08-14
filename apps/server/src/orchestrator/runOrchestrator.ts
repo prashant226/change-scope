@@ -13,6 +13,7 @@ import { reasonAboutChanges } from "../ai/reason.js";
 import { getStore } from "../storage/index.js";
 import type { AgentLogEntry, RunStage } from "../types/run.js";
 import { config } from "../utils/config.js";
+import { computeNextRunAt } from "../utils/schedule.js";
 
 const store = getStore();
 
@@ -82,7 +83,10 @@ export async function executeRun(runId: string): Promise<void> {
         error: capture.error,
         completedAt: new Date().toISOString(),
       });
-      await store.updateMonitor(monitor.id, { lastRunAt: new Date().toISOString() });
+      await store.updateMonitor(monitor.id, {
+        lastRunAt: new Date().toISOString(),
+        nextRunAt: computeNextRunAt(monitor.scheduleFrequency),
+      });
       return; // Failed capture NEVER becomes the new baseline (§7, §61).
     }
     await logger.log("rendering", "Page rendered", "Waited for meaningful content before capturing.", "completed");
@@ -110,6 +114,7 @@ export async function executeRun(runId: string): Promise<void> {
       title: monitor.title || snapshotData.metadata.title,
       lastRunAt: new Date().toISOString(),
       lastSuccessfulSnapshotId: savedSnapshot.id,
+      nextRunAt: computeNextRunAt(monitor.scheduleFrequency),
     });
 
     if (!previousSnapshot) {
@@ -173,6 +178,12 @@ export async function executeRun(runId: string): Promise<void> {
       status: "failed",
       error: { code: "unknown", message: "An unexpected error interrupted this run." },
       completedAt: new Date().toISOString(),
+    });
+    // Still reschedule on a crash — otherwise a scheduled monitor would get
+    // picked up again on every subsequent scheduler tick instead of backing off.
+    await store.updateMonitor(monitor.id, {
+      lastRunAt: new Date().toISOString(),
+      nextRunAt: computeNextRunAt(monitor.scheduleFrequency),
     });
   }
 }

@@ -43,6 +43,12 @@ export class MemoryStore implements StorageAdapter {
     return updated;
   }
 
+  async listDueMonitors(nowIso: string) {
+    return [...this.monitors.values()].filter(
+      (m) => m.status === "active" && (!m.nextRunAt || m.nextRunAt <= nowIso),
+    );
+  }
+
   async createRun(input: Omit<RunRecord, "id" | "startedAt">) {
     const record: RunRecord = { ...input, id: randomUUID(), startedAt: new Date().toISOString() };
     this.runs.set(record.id, record);

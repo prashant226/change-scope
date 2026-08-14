@@ -91,6 +91,16 @@ export class SupabaseStore implements StorageAdapter {
     return rowToMonitor(data);
   }
 
+  async listDueMonitors(nowIso: string) {
+    const { data, error } = await this.client
+      .from("monitored_urls")
+      .select("*")
+      .eq("status", "active")
+      .or(`next_run_at.is.null,next_run_at.lte.${nowIso}`);
+    if (error) throw error;
+    return (data || []).map(rowToMonitor);
+  }
+
   // ---- runs ----------------------------------------------------------------
 
   async createRun(input: Omit<RunRecord, "id" | "startedAt">) {

@@ -56,6 +56,8 @@ export interface StorageAdapter {
   getMonitor(id: string): Promise<MonitorRecord | undefined>;
   listMonitors(userId: string): Promise<MonitorRecord[]>;
   updateMonitor(id: string, patch: Partial<MonitorRecord>): Promise<MonitorRecord>;
+  /** Active monitors across all users whose next_run_at has arrived (or was never set) — used by the scheduler. */
+  listDueMonitors(nowIso: string): Promise<MonitorRecord[]>;
 
   createRun(input: Omit<RunRecord, "id" | "startedAt">): Promise<RunRecord>;
   updateRun(id: string, patch: Partial<RunRecord>): Promise<RunRecord>;

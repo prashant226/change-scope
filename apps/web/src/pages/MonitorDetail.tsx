@@ -7,7 +7,7 @@ import { AgentTrail } from "../components/AgentTrail";
 import { ChangeCard } from "../components/ChangeCard";
 import { SnapshotTimeline } from "../components/SnapshotTimeline";
 import { MonitorStatusBadge } from "../components/StatusBadge";
-import { relativeTime, FREQUENCY_LABELS } from "../lib/format";
+import { relativeTime, formatDateTime, FREQUENCY_LABELS } from "../lib/format";
 import { ChevronDown, ChevronRight } from "lucide-react";
 
 type Tab = "changes" | "history" | "trail" | "settings";
@@ -92,6 +92,9 @@ export function MonitorDetail() {
         <p className="text-sm text-muted mb-3">{monitor.url}</p>
         <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-muted mb-4">
           <span>Last checked: {relativeTime(monitor.lastRunAt)}</span>
+          <span>
+            Next check: {monitor.status === "paused" ? "Paused" : formatDateTime(monitor.nextRunAt)}
+          </span>
           <span>Frequency: {FREQUENCY_LABELS[monitor.scheduleFrequency] || monitor.scheduleFrequency}</span>
           <span>Snapshots: {snapshots.length}</span>
         </div>
@@ -206,8 +209,8 @@ export function MonitorDetail() {
             ))}
           </select>
           <p className="text-xs text-muted mb-4">
-            Note: the scheduler isn't running yet in this build — scheduled checks aren't triggered
-            automatically. Use "Run now" to check manually.
+            Next check: {monitor.status === "paused" ? "Paused" : formatDateTime(monitor.nextRunAt)}. Checks run
+            automatically on this schedule — use "Run now" any time for an immediate check.
           </p>
           <button
             onClick={togglePause}

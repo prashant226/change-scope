@@ -5,10 +5,11 @@ language — what actually changed and why it might matter. It is not a diff vie
 real content/functional changes from CSS noise and uses an LLM only to reason about *significance*,
 never to discover facts.
 
-> **Status: core product working.** URL → capture → snapshot → diff → AI reasoning → report works
-> end to end, with Monitors/Monitor Detail/History/Analytics pages, real Supabase persistence, and
-> real Supabase Auth (login/signup/forgot-password, per-user data isolation) — all verified against
-> a live project. Only the scheduler isn't wired up yet — see [Known limitations](#known-limitations).
+> **Status: feature-complete core product.** URL → capture → snapshot → diff → AI reasoning →
+> report works end to end, with Monitors/Monitor Detail/History/Analytics pages, real Supabase
+> persistence, real Supabase Auth (login/signup/forgot-password, per-user data isolation), and a
+> live scheduler that runs checks automatically — all verified against a real Supabase project, not
+> just typechecked. See [Known limitations](#known-limitations) for what's left (mostly polish).
 
 ## Product use case
 
@@ -65,7 +66,8 @@ matters* and *why*. See `apps/server/src/diff`, `classifier`, and `ai` for the b
 - **Diff:** custom deterministic TypeScript (no LLM involved)
 - **Database/Storage:** Supabase Postgres + Storage (optional — falls back to an in-memory store
   when not configured; see below)
-- **Auth (planned wiring):** Supabase Auth — see [Known limitations](#known-limitations)
+- **Auth:** Supabase Auth (email/password) — optional, same fallback as above
+- **Scheduler:** node-cron, checking once a minute for due monitors
 
 No Redis, no queues, no vector DB — see `docs/supabase-storage-todo.md` for what's intentionally
 deferred.
@@ -153,17 +155,28 @@ Open http://localhost:5173. If Supabase is configured, you'll land on the Login 
 Then paste a public URL and click **Run**. First run creates a baseline; run again (after the
 cooldown) to see a comparison.
 
+### Scheduler
+
+A `node-cron` job checks once a minute for active monitors whose `next_run_at` has arrived and
+triggers a run through the exact same orchestrator a manual "Run now" uses — only `trigger_type`
+differs ("scheduled" vs "manual"). `next_run_at` is computed from the chosen frequency
+(hourly / every 6 hours / daily / weekly) and advances after every run, whether it succeeds, only
+partially completes (AI unavailable), or fails — a crashed run still reschedules rather than
+getting retried every minute. A per-tick batch cap (`MAX_BROWSER_CONCURRENCY`) avoids spiking
+browser concurrency if many monitors come due at once; the rest just get picked up next tick.
+Runs automatically the moment the server is up — no separate process to start.
+
 ### Testing
 
 ```bash
 npm run test:unit --workspace apps/server
 ```
 
-22 unit tests cover: the diff engine (numeric/text/structural/functional/visual/media changes,
+26 unit tests cover: the diff engine (numeric/text/structural/functional/visual/media changes,
 grouping, reordering, semantic-equivalent whitespace, unchanged elements, duplicate non-identifying
 hrefs like `href="#"`), SSRF/URL validation (blocked schemes, localhost, loopback, private IP
-ranges, cloud metadata IP), and the AI reasoning layer (schema validation, no-API-key fallback,
-empty-group short-circuit).
+ranges, cloud metadata IP), the AI reasoning layer (schema validation, no-API-key fallback,
+empty-group short-circuit), and scheduler math (next-run-at computation per frequency).
 
 ## Demo auth
 
@@ -189,8 +202,6 @@ end to end. Not yet implemented:
 
 - **Realtime updates** — the frontend currently polls `/api/runs/:id` every ~1.2s rather than
   subscribing to Supabase Realtime (§64's required fallback path, used as the primary path here).
-- **Scheduler** (node-cron) — not started; schedule fields exist on the monitor record and are
-  editable from Settings, but nothing triggers a run automatically yet. "Run now" always works.
 - **Visual preview** — screenshots are captured by Playwright and uploaded to Supabase Storage
   when configured, but nothing in the UI displays them yet (paths are on the `snapshots` row,
   ready for that feature).
