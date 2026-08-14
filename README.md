@@ -6,8 +6,9 @@ real content/functional changes from CSS noise and uses an LLM only to reason ab
 never to discover facts.
 
 > **Status: core product working.** URL → capture → snapshot → diff → AI reasoning → report works
-> end to end, with Monitors/Monitor Detail/History/Analytics pages and optional Supabase
-> persistence. Auth and the scheduler aren't wired up yet — see [Known limitations](#known-limitations).
+> end to end, with Monitors/Monitor Detail/History/Analytics pages. Supabase persistence is wired
+> up and verified against a real project (data + screenshots survive a server restart). Auth and
+> the scheduler aren't wired up yet — see [Known limitations](#known-limitations).
 
 ## Product use case
 
