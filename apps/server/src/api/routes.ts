@@ -5,6 +5,7 @@ import { normalizeUrl } from "../utils/normalizeUrl.js";
 import { executeRun } from "../orchestrator/runOrchestrator.js";
 import { canStartRun, markRunStarted, markRunFinished } from "./rateLimit.js";
 import { buildAnalytics } from "../reports/analytics.js";
+import { buildMonitorSummaries, buildMonitorSummary } from "../reports/monitorSummary.js";
 import { DEMO_USER_ID } from "../utils/config.js";
 import type { ScheduleFrequency } from "../storage/types.js";
 
@@ -67,13 +68,15 @@ router.post("/monitors", async (req, res) => {
 
 router.get("/monitors", async (req, res) => {
   const monitors = await store.listMonitors(currentUserId(req));
-  res.json({ monitors });
+  const summaries = await buildMonitorSummaries(store, monitors);
+  res.json({ monitors: summaries });
 });
 
 router.get("/monitors/:id", async (req, res) => {
   const monitor = await store.getMonitor(req.params.id);
   if (!monitor) return res.status(404).json({ error: "Monitor not found" });
-  res.json({ monitor });
+  const summary = await buildMonitorSummary(store, monitor);
+  res.json({ monitor: summary });
 });
 
 router.patch("/monitors/:id", async (req, res) => {

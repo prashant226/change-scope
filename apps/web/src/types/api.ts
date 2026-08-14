@@ -51,7 +51,30 @@ export interface MonitorRecord {
   url: string;
   title?: string;
   status: "active" | "paused";
-  scheduleFrequency: string;
+  scheduleFrequency: "hourly" | "every_6_hours" | "daily" | "weekly";
   lastRunAt?: string;
   nextRunAt?: string;
+  latestRunId?: string;
+  latestRunStatus?: RunStatus;
+  latestRunCompletedAt?: string;
+  latestMeaningfulChangeCount?: number;
+}
+
+export interface SnapshotSummary {
+  id: string;
+  runId: string;
+  versionNumber: number;
+  capturedAt: string;
+  isSuccessful: boolean;
+}
+
+export interface AnalyticsSummary {
+  monitorCount: number;
+  meaningfulChangeCount: number;
+  highImpactChangeCount: number;
+  avgChangesPerMonitor: number;
+  changesByType: Record<string, number>;
+  changesByImpact: Record<"high" | "medium" | "low", number>;
+  changesOverTime: Array<{ date: string; count: number }>;
+  mostChangedMonitors: Array<{ monitorId: string; title: string; changeCount: number }>;
 }

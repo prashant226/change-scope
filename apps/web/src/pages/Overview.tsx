@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { useRun } from "../hooks/useRun";
 import { AgentTrail } from "../components/AgentTrail";
@@ -8,6 +9,8 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 export function Overview() {
   const [url, setUrl] = useState("");
   const [runId, setRunId] = useState<string | null>(null);
+  const [monitorId, setMonitorId] = useState<string | null>(null);
+  const [alreadyMonitored, setAlreadyMonitored] = useState(false);
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
   const [showCosmetic, setShowCosmetic] = useState(false);
@@ -21,6 +24,8 @@ export function Overview() {
     try {
       const result = await api.startRun(url.trim());
       setRunId(result.runId);
+      setMonitorId(result.monitorId);
+      setAlreadyMonitored(result.alreadyMonitored);
     } catch (err) {
       setStartError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
@@ -62,6 +67,9 @@ export function Overview() {
           We'll capture the page and compare future runs against the latest successful snapshot.
         </p>
         {startError && <p className="text-sm text-high mt-2">{startError}</p>}
+        {alreadyMonitored && (
+          <p className="text-xs text-muted mt-2">This page is already being monitored — running it again.</p>
+        )}
       </div>
 
       {run && (
@@ -70,6 +78,11 @@ export function Overview() {
             {isRunning ? "Agent is running…" : "Agent Trail"}
           </h2>
           <AgentTrail logs={logs} live={Boolean(isRunning)} />
+          {monitorId && !isRunning && (
+            <Link to={`/monitors/${monitorId}`} className="inline-block mt-4 text-sm font-medium text-primary hover:underline">
+              Open full monitor →
+            </Link>
+          )}
         </section>
       )}
 
