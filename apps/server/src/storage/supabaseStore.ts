@@ -387,13 +387,22 @@ function rowToMonitor(row: any): MonitorRecord {
 }
 
 function rowToRun(row: any): RunRecord {
+  // Runs created before report_type existed have it as null in the DB.
+  // Rather than showing nothing for that historical data, fall back to the
+  // same rule the orchestrator uses going forward (previous_snapshot_id
+  // presence) — a read-time compatibility shim, not a new inference path;
+  // every run written from here on has report_type set explicitly at
+  // write time and never needs this fallback.
+  const isSuccessful = row.status === "completed" || row.status === "partial";
+  const reportType = row.report_type ?? (isSuccessful ? (row.previous_snapshot_id ? "comparison" : "baseline") : undefined);
+
   return {
     id: row.id,
     monitorId: row.monitor_id,
     userId: row.user_id,
     status: row.status,
     triggerType: row.trigger_type,
-    reportType: row.report_type ?? undefined,
+    reportType,
     previousSnapshotId: row.previous_snapshot_id ?? undefined,
     currentSnapshotId: row.current_snapshot_id ?? undefined,
     startedAt: row.started_at,
