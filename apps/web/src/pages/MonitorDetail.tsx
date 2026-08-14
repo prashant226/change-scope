@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import type { MonitorRecord, RunRecord, SnapshotSummary, AnalyzedChange } from "../types/api";
 import { api } from "../lib/api";
 import { useRun } from "../hooks/useRun";
@@ -9,9 +9,11 @@ import { groupByKey } from "../lib/groupChanges";
 import { SnapshotTimeline } from "../components/SnapshotTimeline";
 import { MonitorStatusBadge } from "../components/StatusBadge";
 import { relativeTime, formatDateTime, FREQUENCY_LABELS } from "../lib/format";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { downloadReportPdf } from "../lib/downloadPdf";
+import { ChevronDown, ChevronRight, Download } from "lucide-react";
 
 type Tab = "changes" | "history" | "trail" | "settings";
+type Changes = { meaningful: AnalyzedChange[]; cosmetic: AnalyzedChange[] };
 
 const FREQUENCIES = [
   { value: "hourly", label: "Every hour" },
@@ -22,16 +24,36 @@ const FREQUENCIES = [
 
 export function MonitorDetail() {
   const { id } = useParams<{ id: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const viewingRunId = searchParams.get("run");
+
   const [monitor, setMonitor] = useState<MonitorRecord | null>(null);
   const [snapshots, setSnapshots] = useState<SnapshotSummary[]>([]);
   const [runs, setRuns] = useState<RunRecord[]>([]);
-  const [latestChanges, setLatestChanges] = useState<{ meaningful: AnalyzedChange[]; cosmetic: AnalyzedChange[] } | null>(null);
-  const [latestLogs, setLatestLogs] = useState<Awaited<ReturnType<typeof api.getLogs>>["logs"]>([]);
+
+  // The run currently shown in the Changes/Agent Trail tabs — either a
+  // specific one picked from History, or (by default) the latest finished run.
+  const [selectedRun, setSelectedRun] = useState<RunRecord | null>(null);
+  const [selectedChanges, setSelectedChanges] = useState<Changes | null>(null);
+  const [selectedLogs, setSelectedLogs] = useState<Awaited<ReturnType<typeof api.getLogs>>["logs"]>([]);
+
   const [tab, setTab] = useState<Tab>("changes");
   const [showCosmetic, setShowCosmetic] = useState(false);
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
 
   const { run: liveRun, logs: liveLogs, changes: liveChanges } = useRun(activeRunId);
+
+  const loadSelectedRun = useCallback(async (runId: string) => {
+    const [{ run }, changes, { logs }] = await Promise.all([
+      api.getRun(runId),
+      api.getChanges(runId),
+      api.getLogs(runId),
+    ]);
+    setSelectedRun(run);
+    setSelectedChanges(changes);
+    setSelectedLogs(logs);
+  }, []);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -39,21 +61,19 @@ export function MonitorDetail() {
     setMonitor(m);
     setSnapshots(s);
     setRuns(r);
-    const latest = r.find((run) => run.status === "completed" || run.status === "partial");
-    if (latest) {
-      const [changes, { logs }] = await Promise.all([api.getChanges(latest.id), api.getLogs(latest.id)]);
-      setLatestChanges(changes);
-      setLatestLogs(logs);
-    }
-  }, [id]);
+
+    const targetRunId = viewingRunId || r.find((run) => run.status === "completed" || run.status === "partial" || run.status === "failed")?.id;
+    if (targetRunId) await loadSelectedRun(targetRunId);
+  }, [id, viewingRunId, loadSelectedRun]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  // When a live run started from this page finishes, refresh everything from the server.
+  // When a live run started from this page finishes, refresh and switch to viewing it.
   useEffect(() => {
     if (liveRun && (liveRun.status === "completed" || liveRun.status === "partial" || liveRun.status === "failed")) {
+      setSearchParams(activeRunId ? { run: activeRunId } : {}, { replace: true });
       load();
     }
   }, [liveRun?.status]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -62,6 +82,13 @@ export function MonitorDetail() {
     if (!id) return;
     const { runId } = await api.runMonitor(id);
     setActiveRunId(runId);
+    setTab("changes");
+  }
+
+  function handleSelectRun(runId: string) {
+    setActiveRunId(null);
+    setSearchParams({ run: runId });
+    setTab("changes");
   }
 
   async function togglePause() {
@@ -77,11 +104,22 @@ export function MonitorDetail() {
     setMonitor(updated);
   }
 
+  async function handleDownloadPdf(runId: string) {
+    setDownloadingPdf(true);
+    try {
+      await downloadReportPdf(runId, monitor?.title || monitor?.url);
+    } finally {
+      setDownloadingPdf(false);
+    }
+  }
+
   if (!monitor) return <div className="max-w-4xl mx-auto py-10 px-6 text-muted">Loading…</div>;
 
   const isRunning = liveRun && !["completed", "partial", "failed"].includes(liveRun.status);
-  const displayChanges = liveChanges || latestChanges;
-  const displayLogs = activeRunId ? liveLogs : latestLogs;
+  const displayRun = activeRunId ? liveRun : selectedRun;
+  const displayChanges = activeRunId ? liveChanges : selectedChanges;
+  const displayLogs = activeRunId ? liveLogs : selectedLogs;
+  const isBaseline = displayRun && !displayRun.previousSnapshotId && displayRun.status !== "failed";
 
   return (
     <div className="max-w-4xl mx-auto py-10 px-6">
@@ -138,23 +176,66 @@ export function MonitorDetail() {
               <AgentTrail logs={liveLogs} live />
             </div>
           )}
-          {!displayChanges && !isRunning && (
-            <p className="text-sm text-muted">No comparison available yet. Run this monitor again to see a report.</p>
+
+          {!isRunning && displayRun && viewingRunId && (
+            <p className="text-xs text-muted mb-4">
+              Viewing snapshot from {formatDateTime(displayRun.completedAt || displayRun.startedAt)} —{" "}
+              <button onClick={() => setSearchParams({})} className="text-primary hover:underline">
+                back to latest
+              </button>
+            </p>
           )}
-          {displayChanges && displayChanges.meaningful.length === 0 && !isRunning && (
+
+          {!isRunning && displayRun?.status === "failed" && (
+            <div className="rounded-lg border border-red-200 bg-red-50 p-5 mb-4">
+              <h2 className="text-base font-semibold text-high mb-1">We couldn't capture this page</h2>
+              <p className="text-sm text-ink">{displayRun.error?.message || "The capture failed."}</p>
+              <p className="text-sm text-muted mt-2">The previous successful snapshot remains the current baseline.</p>
+            </div>
+          )}
+
+          {!isRunning && !displayRun && (
+            <p className="text-sm text-muted">No runs yet. Click "Run now" to capture a baseline.</p>
+          )}
+
+          {!isRunning && isBaseline && (
+            <div className="rounded-lg border border-border bg-white p-5 shadow-sm mb-4">
+              <h2 className="text-base font-semibold text-ink mb-1">✓ Baseline created</h2>
+              <p className="text-sm text-muted">
+                This was the first captured snapshot — no comparison was available yet. Future runs compare
+                against it.
+              </p>
+            </div>
+          )}
+
+          {!isRunning && displayChanges && !isBaseline && displayRun?.status !== "failed" && displayChanges.meaningful.length === 0 && (
             <div className="rounded-lg border border-border bg-white p-5 shadow-sm mb-4">
               <h2 className="text-base font-semibold text-ink mb-1">✓ No meaningful changes detected</h2>
-              <p className="text-sm text-muted">This page is materially unchanged since the last successful snapshot.</p>
+              <p className="text-sm text-muted">This page was materially unchanged since the previous snapshot.</p>
             </div>
           )}
-          {displayChanges && displayChanges.meaningful.length > 0 && (
-            <div className="space-y-4 mb-6">
-              {groupByKey(displayChanges.meaningful).map((group) => (
-                <ChangeCard key={group[0].groupKey} changes={group} />
-              ))}
-            </div>
+
+          {!isRunning && displayChanges && displayChanges.meaningful.length > 0 && (
+            <>
+              <div className="flex justify-end mb-3">
+                <button
+                  onClick={() => displayRun && handleDownloadPdf(displayRun.id)}
+                  disabled={downloadingPdf}
+                  className="flex items-center gap-1.5 text-sm font-medium text-primary hover:underline disabled:opacity-50"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  {downloadingPdf ? "Preparing PDF…" : "Download PDF"}
+                </button>
+              </div>
+              <div className="space-y-4 mb-6">
+                {groupByKey(displayChanges.meaningful).map((group) => (
+                  <ChangeCard key={group[0].groupKey} changes={group} />
+                ))}
+              </div>
+            </>
           )}
-          {displayChanges && displayChanges.cosmetic.length > 0 && (
+
+          {!isRunning && displayChanges && displayChanges.cosmetic.length > 0 && (
             <div>
               <button
                 onClick={() => setShowCosmetic((v) => !v)}
@@ -180,7 +261,9 @@ export function MonitorDetail() {
         </section>
       )}
 
-      {tab === "history" && <SnapshotTimeline snapshots={snapshots} runs={runs} />}
+      {tab === "history" && (
+        <SnapshotTimeline snapshots={snapshots} runs={runs} onSelectRun={handleSelectRun} selectedRunId={displayRun?.id} />
+      )}
 
       {tab === "trail" && (
         <section className="rounded-lg border border-border bg-white p-5 shadow-sm">

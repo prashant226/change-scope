@@ -5,7 +5,8 @@ import { useRun } from "../hooks/useRun";
 import { AgentTrail } from "../components/AgentTrail";
 import { ChangeCard } from "../components/ChangeCard";
 import { groupByKey } from "../lib/groupChanges";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { downloadReportPdf } from "../lib/downloadPdf";
+import { ChevronDown, ChevronRight, Download } from "lucide-react";
 
 export function Overview() {
   const [url, setUrl] = useState("");
@@ -15,8 +16,19 @@ export function Overview() {
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
   const [showCosmetic, setShowCosmetic] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
 
   const { run, logs, changes } = useRun(runId);
+
+  async function handleDownloadPdf() {
+    if (!runId) return;
+    setDownloadingPdf(true);
+    try {
+      await downloadReportPdf(runId, url);
+    } finally {
+      setDownloadingPdf(false);
+    }
+  }
 
   async function handleRun() {
     if (!url.trim()) return;
@@ -121,7 +133,17 @@ export function Overview() {
 
       {changes && changes.meaningful.length > 0 && (
         <section className="space-y-4">
-          <h2 className="text-sm font-semibold text-ink">Meaningful changes</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-ink">Meaningful changes</h2>
+            <button
+              onClick={handleDownloadPdf}
+              disabled={downloadingPdf}
+              className="flex items-center gap-1.5 text-sm font-medium text-primary hover:underline disabled:opacity-50"
+            >
+              <Download className="h-3.5 w-3.5" />
+              {downloadingPdf ? "Preparing PDF…" : "Download PDF"}
+            </button>
+          </div>
           {groupByKey(changes.meaningful).map((group) => (
             <ChangeCard key={group[0].groupKey} changes={group} />
           ))}

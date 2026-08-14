@@ -6,6 +6,8 @@ import { triggerRun } from "../orchestrator/trigger.js";
 import { buildAnalytics } from "../reports/analytics.js";
 import { buildMonitorSummaries, buildMonitorSummary } from "../reports/monitorSummary.js";
 import { computeNextRunAt } from "../utils/schedule.js";
+import { buildReportHtml } from "../reports/reportHtml.js";
+import { renderHtmlToPdf } from "../reports/renderPdf.js";
 import type { ScheduleFrequency } from "../storage/types.js";
 
 const router = Router();
@@ -144,6 +146,30 @@ router.get("/runs/:id/logs", async (req, res) => {
   if (!run || run.userId !== req.userId) return res.status(404).json({ error: "Run not found" });
   const logs = await store.getLogs(req.params.id);
   res.json({ logs });
+});
+
+// GET /api/runs/:id/report.pdf — downloadable PDF of the change report (§23-ish: a shareable artifact, not just an on-screen view).
+router.get("/runs/:id/report.pdf", async (req, res) => {
+  const run = await store.getRun(req.params.id);
+  if (!run || run.userId !== req.userId) return res.status(404).json({ error: "Run not found" });
+  const monitor = await store.getMonitor(run.monitorId);
+  if (!monitor) return res.status(404).json({ error: "Monitor not found" });
+
+  const changes = await store.getChanges(req.params.id);
+  const meaningful = changes.filter((c) => c.meaningful).sort((a, b) => rank(b.significance) - rank(a.significance));
+  const cosmetic = changes.filter((c) => !c.meaningful);
+
+  try {
+    const html = buildReportHtml(monitor, run, meaningful, cosmetic);
+    const pdf = await renderHtmlToPdf(html);
+    const filenameSafeTitle = (monitor.title || "report").replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="changescope-${filenameSafeTitle}.pdf"`);
+    res.send(pdf);
+  } catch (err) {
+    console.error("[api] PDF generation failed:", err);
+    res.status(500).json({ error: "Could not generate the PDF report." });
+  }
 });
 
 router.get("/analytics", async (req, res) => {

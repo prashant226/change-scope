@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import type { MonitorRecord, RunRecord, SnapshotSummary } from "../types/api";
 import { SnapshotTimeline } from "../components/SnapshotTimeline";
 
 export function History() {
+  const navigate = useNavigate();
   const [monitors, setMonitors] = useState<MonitorRecord[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [snapshots, setSnapshots] = useState<SnapshotSummary[]>([]);
@@ -52,7 +54,12 @@ export function History() {
           </select>
 
           <div className="rounded-lg border border-border bg-white p-6 shadow-sm">
-            <SnapshotTimeline snapshots={snapshots} runs={runs} />
+            <p className="text-xs text-muted mb-4">Click a snapshot to open its full report and agent trail.</p>
+            <SnapshotTimeline
+              snapshots={snapshots}
+              runs={runs}
+              onSelectRun={(runId) => selectedId && navigate(`/monitors/${selectedId}?run=${runId}`)}
+            />
           </div>
         </>
       )}
