@@ -119,6 +119,12 @@ export class MemoryStore implements StorageAdapter {
       .sort((a, b) => b.versionNumber - a.versionNumber);
   }
 
+  async getScreenshotUrl(snapshotId: string) {
+    const snapshot = this.snapshots.get(snapshotId);
+    if (!snapshot?.screenshotBuffer) return undefined;
+    return `data:image/png;base64,${snapshot.screenshotBuffer.toString("base64")}`;
+  }
+
   async saveChanges(runId: string, changes: AnalyzedChange[]) {
     this.changes.set(runId, changes);
   }

@@ -1,4 +1,5 @@
 export type RunStatus = "queued" | "running" | "completed" | "partial" | "failed";
+export type ReportType = "baseline" | "comparison";
 
 export interface AgentLogEntry {
   sequence: number;
@@ -20,6 +21,7 @@ export interface RunRecord {
   monitorId: string;
   status: RunStatus;
   triggerType: "manual" | "scheduled";
+  reportType?: ReportType;
   previousSnapshotId?: string;
   currentSnapshotId?: string;
   startedAt: string;
@@ -29,6 +31,26 @@ export interface RunRecord {
   cosmeticChangeCount: number;
   aiStatus: "pending" | "completed" | "unavailable";
   captureStatus: "pending" | "complete" | "partial" | "failed";
+}
+
+/** RunRecord as returned by the History endpoint — includes a compact change preview per run. */
+export interface RunWithPreview extends RunRecord {
+  topChanges: string[];
+  topSignificance: "high" | "medium" | "low" | null;
+}
+
+export interface BaselineSummary {
+  pageTitle: string;
+  finalUrl: string;
+  capturedAt: string;
+  stats: {
+    sectionCount: number;
+    contentElementCount: number;
+    interactiveElementCount: number;
+    imageCount: number;
+  };
+  sectionHeadings: string[];
+  screenshotUrl?: string;
 }
 
 export interface AnalyzedChange {

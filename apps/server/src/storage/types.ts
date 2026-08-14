@@ -1,6 +1,6 @@
 import type { PageSnapshot } from "../types/snapshot.js";
 import type { AnalyzedChange } from "../types/change.js";
-import type { AgentLogEntry, RunErrorInfo, RunStatus } from "../types/run.js";
+import type { AgentLogEntry, RunErrorInfo, RunStatus, ReportType } from "../types/run.js";
 
 export type ScheduleFrequency = "hourly" | "every_6_hours" | "daily" | "weekly";
 export type MonitorStatus = "active" | "paused";
@@ -26,6 +26,8 @@ export interface RunRecord {
   userId: string;
   status: RunStatus;
   triggerType: "manual" | "scheduled";
+  /** Set once the run resolves which kind of report it produced — undefined while still queued/running. */
+  reportType?: ReportType;
   previousSnapshotId?: string;
   currentSnapshotId?: string;
   startedAt: string;
@@ -73,6 +75,8 @@ export interface StorageAdapter {
   getLastSuccessfulSnapshot(monitorId: string): Promise<SnapshotRecord | undefined>;
   getSnapshot(id: string): Promise<SnapshotRecord | undefined>;
   listSnapshotsForMonitor(monitorId: string): Promise<SnapshotRecord[]>;
+  /** A short-lived viewable URL for the snapshot's screenshot ("View page preview" evidence action) — undefined if none was captured. */
+  getScreenshotUrl(snapshotId: string): Promise<string | undefined>;
 
   saveChanges(runId: string, changes: AnalyzedChange[]): Promise<void>;
   getChanges(runId: string): Promise<AnalyzedChange[]>;

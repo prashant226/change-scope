@@ -136,6 +136,7 @@ export class SupabaseStore implements StorageAdapter {
         user_id: input.userId,
         status: input.status,
         trigger_type: input.triggerType,
+        report_type: input.reportType,
         previous_snapshot_id: input.previousSnapshotId,
         current_snapshot_id: input.currentSnapshotId,
         completed_at: input.completedAt,
@@ -157,6 +158,7 @@ export class SupabaseStore implements StorageAdapter {
       .from("runs")
       .update({
         ...(patch.status !== undefined && { status: patch.status }),
+        ...(patch.reportType !== undefined && { report_type: patch.reportType }),
         ...(patch.previousSnapshotId !== undefined && { previous_snapshot_id: patch.previousSnapshotId }),
         ...(patch.currentSnapshotId !== undefined && { current_snapshot_id: patch.currentSnapshotId }),
         ...(patch.completedAt !== undefined && { completed_at: patch.completedAt }),
@@ -298,6 +300,21 @@ export class SupabaseStore implements StorageAdapter {
     return (data || []).map(rowToSnapshot);
   }
 
+  async getScreenshotUrl(snapshotId: string) {
+    const { data, error } = await this.client
+      .from("snapshots")
+      .select("screenshot_path")
+      .eq("id", snapshotId)
+      .maybeSingle();
+    if (error || !data?.screenshot_path) return undefined;
+
+    const { data: signed, error: signError } = await this.client.storage
+      .from(SCREENSHOTS_BUCKET)
+      .createSignedUrl(data.screenshot_path, 60 * 10); // 10 minutes — just long enough to view, not a durable link
+    if (signError) return undefined;
+    return signed?.signedUrl;
+  }
+
   // ---- changes -----------------------------------------------------------
 
   async saveChanges(runId: string, changes: AnalyzedChange[]) {
@@ -376,6 +393,7 @@ function rowToRun(row: any): RunRecord {
     userId: row.user_id,
     status: row.status,
     triggerType: row.trigger_type,
+    reportType: row.report_type ?? undefined,
     previousSnapshotId: row.previous_snapshot_id ?? undefined,
     currentSnapshotId: row.current_snapshot_id ?? undefined,
     startedAt: row.started_at,

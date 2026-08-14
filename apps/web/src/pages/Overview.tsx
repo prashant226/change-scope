@@ -1,19 +1,22 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { useRun } from "../hooks/useRun";
 import { AgentTrail } from "../components/AgentTrail";
 import { ChangeCard } from "../components/ChangeCard";
 import { ReportSummary } from "../components/ReportSummary";
+import { BaselineReport } from "../components/BaselineReport";
 import { PageHeader } from "../components/PageHeader";
 import { groupByKey } from "../lib/groupChanges";
 import { downloadReportPdf } from "../lib/downloadPdf";
+import type { MonitorRecord } from "../types/api";
 import { ArrowRight, ChevronDown, ChevronRight, Download, Globe } from "lucide-react";
 
 export function Overview() {
   const [url, setUrl] = useState("");
   const [runId, setRunId] = useState<string | null>(null);
   const [monitorId, setMonitorId] = useState<string | null>(null);
+  const [monitor, setMonitor] = useState<MonitorRecord | null>(null);
   const [alreadyMonitored, setAlreadyMonitored] = useState(false);
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
@@ -21,6 +24,17 @@ export function Overview() {
   const [downloadingPdf, setDownloadingPdf] = useState(false);
 
   const { run, logs, changes } = useRun(runId);
+
+  const isRunning = run && !["completed", "partial", "failed"].includes(run.status);
+
+  // Fetch the monitor record (for the baseline report's "what happens next"
+  // scheduling text) once the run has actually finished — nextRunAt is only
+  // meaningful after the orchestrator has updated it.
+  useEffect(() => {
+    if (monitorId && !isRunning && run) {
+      api.getMonitor(monitorId).then((r) => setMonitor(r.monitor)).catch(() => undefined);
+    }
+  }, [monitorId, isRunning, run?.status]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleDownloadPdf() {
     if (!runId) return;
@@ -48,10 +62,9 @@ export function Overview() {
     }
   }
 
-  const isRunning = run && !["completed", "partial", "failed"].includes(run.status);
-  const isFirstRun = run && (run.status === "completed" || run.status === "partial") && !run.previousSnapshotId;
-  const isNoChange =
-    changes && run && (run.status === "completed" || run.status === "partial") && changes.meaningful.length === 0;
+  const isBaseline = run && (run.status === "completed" || run.status === "partial") && run.reportType === "baseline";
+  const isComparison = run && (run.status === "completed" || run.status === "partial") && run.reportType === "comparison";
+  const isNoChange = isComparison && changes && changes.meaningful.length === 0;
 
   return (
     <div className="max-w-3xl mx-auto py-12 px-6">
@@ -118,29 +131,22 @@ export function Overview() {
         </section>
       )}
 
-      {isFirstRun && (
-        <section className="card p-5">
-          <h2 className="text-base font-semibold text-ink mb-1">✓ Baseline created</h2>
-          <p className="text-sm text-muted">
-            We captured this page as your starting snapshot. No comparison is available yet — future runs
-            will compare the latest version against this baseline.
-          </p>
-        </section>
-      )}
+      {isBaseline && run && monitor && <BaselineReport run={run} monitor={monitor} />}
 
       {isNoChange && (
         <section className="card p-5">
           <h2 className="text-base font-semibold text-ink mb-1">✓ No meaningful changes detected</h2>
-          <p className="text-sm text-muted">This page is materially unchanged since the last successful snapshot.</p>
+          <p className="text-sm text-muted">This page is materially unchanged since the previous successful scan.</p>
           {changes && changes.cosmetic.length > 0 && (
             <p className="text-sm text-muted mt-1">
-              {changes.cosmetic.length} cosmetic change(s) were detected and excluded from this summary.
+              {changes.cosmetic.length} cosmetic change{changes.cosmetic.length === 1 ? "" : "s"} detected and
+              excluded from this summary.
             </p>
           )}
         </section>
       )}
 
-      {changes && changes.meaningful.length > 0 && (
+      {isComparison && changes && changes.meaningful.length > 0 && (
         <section>
           <div className="flex items-start justify-between gap-4">
             <ReportSummary meaningful={changes.meaningful} cosmeticCount={changes.cosmetic.length} />
@@ -161,7 +167,7 @@ export function Overview() {
         </section>
       )}
 
-      {changes && changes.cosmetic.length > 0 && (
+      {isComparison && changes && changes.cosmetic.length > 0 && (
         <section className="mt-6">
           <button
             onClick={() => setShowCosmetic((v) => !v)}

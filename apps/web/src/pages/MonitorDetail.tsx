@@ -6,6 +6,7 @@ import { useRun } from "../hooks/useRun";
 import { AgentTrail } from "../components/AgentTrail";
 import { ChangeCard } from "../components/ChangeCard";
 import { ReportSummary } from "../components/ReportSummary";
+import { BaselineReport } from "../components/BaselineReport";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { groupByKey } from "../lib/groupChanges";
 import { SnapshotTimeline } from "../components/SnapshotTimeline";
@@ -137,7 +138,8 @@ export function MonitorDetail() {
   const displayRun = activeRunId ? liveRun : selectedRun;
   const displayChanges = activeRunId ? liveChanges : selectedChanges;
   const displayLogs = activeRunId ? liveLogs : selectedLogs;
-  const isBaseline = displayRun && !displayRun.previousSnapshotId && displayRun.status !== "failed";
+  const isBaseline = displayRun && displayRun.status !== "failed" && displayRun.reportType === "baseline";
+  const isComparison = displayRun && displayRun.status !== "failed" && displayRun.reportType === "comparison";
 
   return (
     <div className="max-w-4xl mx-auto py-10 px-6">
@@ -209,24 +211,18 @@ export function MonitorDetail() {
             <p className="text-sm text-muted">No runs yet. Click "Run now" to capture a baseline.</p>
           )}
 
-          {!isRunning && isBaseline && (
-            <div className="card p-5 mb-4">
-              <h2 className="text-base font-semibold text-ink mb-1">✓ Baseline created</h2>
-              <p className="text-sm text-muted">
-                This was the first captured snapshot — no comparison was available yet. Future runs compare
-                against it.
-              </p>
-            </div>
+          {!isRunning && isBaseline && displayRun && (
+            <BaselineReport run={displayRun} monitor={monitor} />
           )}
 
-          {!isRunning && displayChanges && !isBaseline && displayRun?.status !== "failed" && displayChanges.meaningful.length === 0 && (
+          {!isRunning && isComparison && displayChanges && displayChanges.meaningful.length === 0 && (
             <div className="card p-5 mb-4">
               <h2 className="text-base font-semibold text-ink mb-1">✓ No meaningful changes detected</h2>
-              <p className="text-sm text-muted">This page was materially unchanged since the previous snapshot.</p>
+              <p className="text-sm text-muted">This page was materially unchanged since the previous scan.</p>
             </div>
           )}
 
-          {!isRunning && displayChanges && displayChanges.meaningful.length > 0 && (
+          {!isRunning && isComparison && displayChanges && displayChanges.meaningful.length > 0 && (
             <>
               <div className="flex items-start justify-between gap-4">
                 <ReportSummary meaningful={displayChanges.meaningful} cosmeticCount={displayChanges.cosmetic.length} />
@@ -247,7 +243,7 @@ export function MonitorDetail() {
             </>
           )}
 
-          {!isRunning && displayChanges && displayChanges.cosmetic.length > 0 && (
+          {!isRunning && isComparison && displayChanges && displayChanges.cosmetic.length > 0 && (
             <div>
               <button
                 onClick={() => setShowCosmetic((v) => !v)}

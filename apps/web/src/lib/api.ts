@@ -2,8 +2,10 @@ import type {
   AnalyzedChange,
   AgentLogEntry,
   AnalyticsSummary,
+  BaselineSummary,
   MonitorRecord,
   RunRecord,
+  RunWithPreview,
   SnapshotSummary,
 } from "../types/api";
 import { supabase } from "./supabaseClient";
@@ -50,9 +52,11 @@ export const api = {
   getLogs: (runId: string) => request<{ logs: AgentLogEntry[] }>(`/runs/${runId}/logs`),
   getChanges: (runId: string) =>
     request<{ meaningful: AnalyzedChange[]; cosmetic: AnalyzedChange[] }>(`/runs/${runId}/changes`),
+  getBaselineSummary: (runId: string) => request<BaselineSummary>(`/runs/${runId}/baseline-summary`),
+  getScreenshotUrl: (runId: string) => request<{ url: string }>(`/runs/${runId}/screenshot-url`),
   listMonitors: () => request<{ monitors: MonitorRecord[] }>("/monitors"),
   getMonitor: (id: string) => request<{ monitor: MonitorRecord }>(`/monitors/${id}`),
   getHistory: (id: string) =>
-    request<{ snapshots: SnapshotSummary[]; runs: RunRecord[] }>(`/monitors/${id}/history`),
+    request<{ snapshots: SnapshotSummary[]; runs: RunWithPreview[] }>(`/monitors/${id}/history`),
   getAnalytics: () => request<AnalyticsSummary>("/analytics"),
 };

@@ -8,6 +8,8 @@ import { buildMonitorSummaries, buildMonitorSummary } from "../reports/monitorSu
 import { computeNextRunAt } from "../utils/schedule.js";
 import { buildReportHtml } from "../reports/reportHtml.js";
 import { renderHtmlToPdf } from "../reports/renderPdf.js";
+import { buildBaselineSummary } from "../reports/buildBaselineSummary.js";
+import { buildChangePreview } from "../reports/buildChangePreview.js";
 import type { ScheduleFrequency } from "../storage/types.js";
 
 const router = Router();
@@ -91,12 +93,27 @@ router.get("/monitors/:id/history", async (req, res) => {
   if (!monitor) return res.status(404).json({ error: "Monitor not found" });
   const snapshots = await store.listSnapshotsForMonitor(req.params.id);
   const runs = await store.listRunsForMonitor(req.params.id);
+
+  // A short "most important change" preview per run, so the History timeline
+  // can show *what* happened without the caller re-fetching every run's
+  // full change list separately.
+  const runsWithPreview = await Promise.all(
+    runs.map(async (run) => {
+      if (run.status === "failed" || run.reportType !== "comparison" || run.meaningfulChangeCount === 0) {
+        return { ...run, topChanges: [] as string[], topSignificance: null };
+      }
+      const changes = await store.getChanges(run.id);
+      const preview = buildChangePreview(changes.filter((c) => c.meaningful));
+      return { ...run, topChanges: preview.lines, topSignificance: preview.topSignificance };
+    }),
+  );
+
   res.json({
     snapshots: snapshots.map((s) => ({
       id: s.id, runId: s.runId, versionNumber: s.versionNumber,
       capturedAt: s.snapshot.metadata.capturedAt, isSuccessful: s.isSuccessful,
     })),
-    runs,
+    runs: runsWithPreview,
   });
 });
 
@@ -148,6 +165,31 @@ router.get("/runs/:id/changes", async (req, res) => {
     .sort((a, b) => rank(b.significance) - rank(a.significance));
   const cosmetic = changes.filter((c) => !c.meaningful);
   res.json({ meaningful, cosmetic });
+});
+
+// GET /api/runs/:id/baseline-summary — "what we captured" for a baseline report (reportType === "baseline").
+router.get("/runs/:id/baseline-summary", async (req, res) => {
+  const run = await store.getRun(req.params.id);
+  if (!run || run.userId !== req.userId) return res.status(404).json({ error: "Run not found" });
+  if (!run.currentSnapshotId) return res.status(404).json({ error: "No snapshot available for this run" });
+
+  const snapshot = await store.getSnapshot(run.currentSnapshotId);
+  if (!snapshot) return res.status(404).json({ error: "Snapshot not found" });
+
+  const summary = buildBaselineSummary(snapshot.snapshot);
+  const screenshotUrl = await store.getScreenshotUrl(snapshot.id).catch(() => undefined);
+  res.json({ ...summary, screenshotUrl });
+});
+
+// GET /api/runs/:id/screenshot-url — short-lived viewable URL for this run's captured page preview.
+router.get("/runs/:id/screenshot-url", async (req, res) => {
+  const run = await store.getRun(req.params.id);
+  if (!run || run.userId !== req.userId) return res.status(404).json({ error: "Run not found" });
+  if (!run.currentSnapshotId) return res.status(404).json({ error: "No snapshot available for this run" });
+
+  const url = await store.getScreenshotUrl(run.currentSnapshotId).catch(() => undefined);
+  if (!url) return res.status(404).json({ error: "No screenshot was captured for this run" });
+  res.json({ url });
 });
 
 router.get("/runs/:id/logs", async (req, res) => {

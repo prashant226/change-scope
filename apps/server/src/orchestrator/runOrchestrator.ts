@@ -13,6 +13,7 @@ import { partitionChanges } from "../classifier/partition.js";
 import { buildCosmeticChanges } from "../classifier/buildCosmeticChanges.js";
 import { reasonAboutChanges } from "../ai/reason.js";
 import { countGroups } from "../reports/countGroups.js";
+import { determineReportType } from "../reports/determineReportType.js";
 import { getStore } from "../storage/index.js";
 import type { AgentLogEntry, RunStage } from "../types/run.js";
 import { config } from "../utils/config.js";
@@ -121,9 +122,10 @@ export async function executeRun(runId: string): Promise<void> {
     });
 
     if (!previousSnapshot) {
-      await logger.log("completed", "Baseline created", "We captured this page as your starting snapshot. Future runs will compare against it.", "completed");
+      await logger.log("building_report", "Baseline report generated", "Converting the captured page state into a baseline report — nothing to compare against yet.", "completed");
       await store.updateRun(runId, {
         status: "completed",
+        reportType: determineReportType(false),
         captureStatus: "complete",
         currentSnapshotId: savedSnapshot.id,
         completedAt: new Date().toISOString(),
@@ -168,7 +170,7 @@ export async function executeRun(runId: string): Promise<void> {
       reasonResult.aiUnavailable ? "failed" : "completed",
     );
 
-    await logger.log("building_report", "Report generated", "Converting analyzed changes into the final user-facing report.", "in_progress");
+    await logger.log("building_report", "Comparison report generated", "Converting analyzed changes into the final user-facing report.", "in_progress");
     const allChanges = [...reasonResult.changes, ...buildCosmeticChanges(cosmetic)];
     await store.saveChanges(runId, allChanges);
 
@@ -177,6 +179,7 @@ export async function executeRun(runId: string): Promise<void> {
 
     await store.updateRun(runId, {
       status: reasonResult.aiUnavailable ? "partial" : "completed",
+      reportType: determineReportType(true),
       captureStatus: "complete",
       previousSnapshotId: previousSnapshot.id,
       currentSnapshotId: savedSnapshot.id,

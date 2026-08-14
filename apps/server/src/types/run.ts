@@ -17,6 +17,15 @@ export type RunStage =
 
 export type RunStatus = "queued" | "running" | "completed" | "partial" | "failed";
 
+/**
+ * Every successful run produces a report; which kind depends solely on
+ * whether a previous successful snapshot existed for this monitor —
+ * never inferred from array order, timestamps, or row order elsewhere.
+ * "baseline": first successful capture, nothing to compare against yet.
+ * "comparison": a real diff ran (possibly finding zero meaningful changes).
+ */
+export type ReportType = "baseline" | "comparison";
+
 export interface AgentLogEntry {
   sequence: number;
   timestamp: string;
