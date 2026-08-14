@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { CheckCircle2, ExternalLink, FileText, Image as ImageIcon, MousePointerClick, Layers } from "lucide-react";
+import { CheckCircle2, ExternalLink, FileText, Image as ImageIcon, MousePointerClick, Layers, X } from "lucide-react";
 import { api } from "../lib/api";
 import type { BaselineSummary, MonitorRecord, RunRecord } from "../types/api";
 import { formatDateTime, FREQUENCY_LABELS } from "../lib/format";
@@ -19,7 +19,11 @@ export function BaselineReport({ run, monitor }: { run: RunRecord; monitor: Moni
     api.getBaselineSummary(run.id).then(setSummary).catch(() => setSummary(null));
   }, [run.id]);
 
-  async function handleViewPreview() {
+  async function handleTogglePreview() {
+    if (showPreview) {
+      setShowPreview(false);
+      return;
+    }
     setShowPreview(true);
     if (previewUrl || previewError) return;
     try {
@@ -84,19 +88,28 @@ export function BaselineReport({ run, monitor }: { run: RunRecord; monitor: Moni
           <div className="card p-5">
             <h3 className="text-[13px] font-semibold uppercase tracking-wide text-muted mb-3">Snapshot evidence</h3>
             <div className="flex gap-2">
-              <button onClick={handleViewPreview} className="btn-secondary flex items-center gap-1.5 text-sm">
-                <ExternalLink className="h-3.5 w-3.5" />
-                View page preview
+              <button onClick={handleTogglePreview} className="btn-secondary flex items-center gap-1.5 text-sm">
+                {showPreview ? <X className="h-3.5 w-3.5" /> : <ExternalLink className="h-3.5 w-3.5" />}
+                {showPreview ? "Hide preview" : "View page preview"}
               </button>
             </div>
             {showPreview && (
-              <div className="mt-4">
+              <div className="mt-4 relative">
                 {previewUrl && (
-                  <img
-                    src={previewUrl}
-                    alt="Captured page preview"
-                    className="w-full rounded-lg border border-border"
-                  />
+                  <>
+                    <img
+                      src={previewUrl}
+                      alt="Captured page preview"
+                      className="w-full rounded-lg border border-border"
+                    />
+                    <button
+                      onClick={() => setShowPreview(false)}
+                      aria-label="Close preview"
+                      className="absolute top-2 right-2 rounded-full bg-ink/70 hover:bg-ink/90 text-white p-1.5 transition-colors"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </>
                 )}
                 {previewError && <p className="text-sm text-muted">{previewError}</p>}
                 {!previewUrl && !previewError && <p className="text-sm text-muted">Loading preview…</p>}
