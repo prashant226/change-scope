@@ -3,6 +3,7 @@ import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis
 import { api } from "../lib/api";
 import type { AnalyticsSummary } from "../types/api";
 import { PageHeader } from "../components/PageHeader";
+import { InfoTooltip } from "../components/InfoTooltip";
 
 // Fixed-order categorical slots (first 5 of the validated 8-hue theme) — used only
 // for "changes by type", where category identity (not status) is what's encoded.
@@ -22,19 +23,25 @@ const IMPACT_COLORS: Record<string, string> = {
   low: "#16A34A",
 };
 
-function StatCard({ label, value }: { label: string; value: string | number }) {
+function StatCard({ label, value, info }: { label: string; value: string | number; info: string }) {
   return (
     <div className="card p-5">
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted mb-1.5">{label}</p>
+      <div className="flex items-center gap-1.5 mb-1.5">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted">{label}</p>
+        <InfoTooltip text={info} />
+      </div>
       <p className="text-[28px] font-semibold text-ink tracking-tight">{value}</p>
     </div>
   );
 }
 
-function ChartCard({ title, children }: { title: string; children: React.ReactNode }) {
+function ChartCard({ title, info, children }: { title: string; info: string; children: React.ReactNode }) {
   return (
     <div className="card p-5">
-      <h2 className="text-sm font-semibold text-ink mb-4">{title}</h2>
+      <div className="flex items-center gap-1.5 mb-4">
+        <h2 className="text-sm font-semibold text-ink">{title}</h2>
+        <InfoTooltip text={info} />
+      </div>
       <div className="h-56">{children}</div>
     </div>
   );
@@ -61,14 +68,33 @@ export function Analytics() {
       <PageHeader title="Analytics" subtitle="What is changing, where, and how often?" />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <StatCard label="Monitors" value={data.monitorCount} />
-        <StatCard label="Meaningful changes" value={data.meaningfulChangeCount} />
-        <StatCard label="High-impact changes" value={data.highImpactChangeCount} />
-        <StatCard label="Avg. changes / monitor" value={data.avgChangesPerMonitor} />
+        <StatCard
+          label="Monitors"
+          value={data.monitorCount}
+          info="How many webpages you currently have set up for tracking."
+        />
+        <StatCard
+          label="Meaningful changes"
+          value={data.meaningfulChangeCount}
+          info="Real, significant changes detected across all your monitors. Cosmetic-only changes — like colors or spacing — are filtered out and not counted here."
+        />
+        <StatCard
+          label="High-impact changes"
+          value={data.highImpactChangeCount}
+          info="Of the meaningful changes above, how many the AI judged likely to matter a lot — e.g. a price drop or a product going out of stock."
+        />
+        <StatCard
+          label="Avg. changes / monitor"
+          value={data.avgChangesPerMonitor}
+          info="Meaningful changes detected so far, divided by the number of monitors — a rough sense of how active each tracked page has been."
+        />
       </div>
 
       <div className="grid md:grid-cols-2 gap-4 mb-6">
-        <ChartCard title="Meaningful changes over time">
+        <ChartCard
+          title="Meaningful changes over time"
+          info="How many meaningful changes were detected on each date, across all your monitors combined."
+        >
           {data.changesOverTime.length === 0 ? (
             <EmptyChart />
           ) : (
@@ -84,7 +110,10 @@ export function Analytics() {
           )}
         </ChartCard>
 
-        <ChartCard title="Changes by type">
+        <ChartCard
+          title="Changes by type"
+          info="What kind of change was detected — content (text or values), structural (layout), functional (buttons or links), visual (styling), media (images), or metadata (page info)."
+        >
           {typeData.length === 0 ? (
             <EmptyChart />
           ) : (
@@ -104,7 +133,10 @@ export function Analytics() {
           )}
         </ChartCard>
 
-        <ChartCard title="Changes by impact">
+        <ChartCard
+          title="Changes by impact"
+          info="How many meaningful changes fall into each significance level — High, Medium, or Low — as judged by the AI."
+        >
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={impactData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" vertical={false} />
@@ -121,7 +153,10 @@ export function Analytics() {
         </ChartCard>
 
         <div className="card p-5">
-          <h2 className="text-sm font-semibold text-ink mb-4">Most changed monitors</h2>
+          <div className="flex items-center gap-1.5 mb-4">
+            <h2 className="text-sm font-semibold text-ink">Most changed monitors</h2>
+            <InfoTooltip text="Your monitors ranked by how many meaningful changes have been detected on each since you started tracking it." />
+          </div>
           {data.mostChangedMonitors.length === 0 ? (
             <p className="text-sm text-muted">No changes recorded yet.</p>
           ) : (
