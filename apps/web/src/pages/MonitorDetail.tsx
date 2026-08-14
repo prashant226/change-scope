@@ -123,13 +123,13 @@ export function MonitorDetail() {
 
   return (
     <div className="max-w-4xl mx-auto py-10 px-6">
-      <header className="mb-6">
-        <div className="flex items-center gap-2 mb-1">
-          <h1 className="text-xl font-semibold text-ink">{monitor.title || monitor.url}</h1>
+      <header className="mb-7">
+        <div className="flex items-center gap-2.5 mb-1.5">
+          <h1 className="text-[22px] font-semibold text-ink tracking-tight">{monitor.title || monitor.url}</h1>
           <MonitorStatusBadge status={monitor.status} />
         </div>
-        <p className="text-sm text-muted mb-3">{monitor.url}</p>
-        <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-muted mb-4">
+        <p className="text-sm text-muted mb-4">{monitor.url}</p>
+        <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-muted mb-5">
           <span>Last checked: {relativeTime(monitor.lastRunAt)}</span>
           <span>
             Next check: {monitor.status === "paused" ? "Paused" : formatDateTime(monitor.nextRunAt)}
@@ -138,17 +138,10 @@ export function MonitorDetail() {
           <span>Snapshots: {snapshots.length}</span>
         </div>
         <div className="flex gap-2">
-          <button
-            onClick={handleRunNow}
-            disabled={Boolean(isRunning)}
-            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-          >
+          <button onClick={handleRunNow} disabled={Boolean(isRunning)} className="btn-primary">
             {isRunning ? "Running…" : "Run now"}
           </button>
-          <button
-            onClick={togglePause}
-            className="rounded-md border border-border px-4 py-2 text-sm font-medium text-ink hover:bg-soft"
-          >
+          <button onClick={togglePause} className="btn-secondary">
             {monitor.status === "active" ? "Pause" : "Resume"}
           </button>
         </div>
@@ -159,7 +152,7 @@ export function MonitorDetail() {
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${
+            className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
               tab === t ? "border-primary text-primary" : "border-transparent text-muted hover:text-ink"
             }`}
           >
@@ -171,7 +164,7 @@ export function MonitorDetail() {
       {tab === "changes" && (
         <section>
           {isRunning && (
-            <div className="rounded-lg border border-border bg-white p-5 shadow-sm mb-6">
+            <div className="card p-5 mb-6">
               <h2 className="text-sm font-semibold text-ink mb-4">Agent is running…</h2>
               <AgentTrail logs={liveLogs} live />
             </div>
@@ -199,7 +192,7 @@ export function MonitorDetail() {
           )}
 
           {!isRunning && isBaseline && (
-            <div className="rounded-lg border border-border bg-white p-5 shadow-sm mb-4">
+            <div className="card p-5 mb-4">
               <h2 className="text-base font-semibold text-ink mb-1">✓ Baseline created</h2>
               <p className="text-sm text-muted">
                 This was the first captured snapshot — no comparison was available yet. Future runs compare
@@ -209,7 +202,7 @@ export function MonitorDetail() {
           )}
 
           {!isRunning && displayChanges && !isBaseline && displayRun?.status !== "failed" && displayChanges.meaningful.length === 0 && (
-            <div className="rounded-lg border border-border bg-white p-5 shadow-sm mb-4">
+            <div className="card p-5 mb-4">
               <h2 className="text-base font-semibold text-ink mb-1">✓ No meaningful changes detected</h2>
               <p className="text-sm text-muted">This page was materially unchanged since the previous snapshot.</p>
             </div>
@@ -247,7 +240,7 @@ export function MonitorDetail() {
               {showCosmetic && (
                 <div className="mt-3 space-y-3">
                   {displayChanges.cosmetic.map((c) => (
-                    <div key={c.groupKey} className="rounded-md border border-border p-3 text-sm">
+                    <div key={c.groupKey} className="rounded-lg border border-border p-3 text-sm">
                       <p className="text-ink">
                         {c.elementLabel || c.groupTitle}: {c.beforeValue} → {c.afterValue}
                       </p>
@@ -266,7 +259,7 @@ export function MonitorDetail() {
       )}
 
       {tab === "trail" && (
-        <section className="rounded-lg border border-border bg-white p-5 shadow-sm">
+        <section className="card p-5">
           {displayLogs.length === 0 ? (
             <p className="text-sm text-muted">No agent activity recorded yet.</p>
           ) : (
@@ -276,13 +269,13 @@ export function MonitorDetail() {
       )}
 
       {tab === "settings" && (
-        <section className="rounded-lg border border-border bg-white p-5 shadow-sm max-w-md">
+        <section className="card p-5 max-w-md">
           <label className="block text-xs font-medium text-muted mb-1" htmlFor="frequency">
             Check frequency
           </label>
           <select
             id="frequency"
-            className="w-full rounded-md border border-border px-3 py-2 text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-primary"
+            className="w-full rounded-lg border border-border px-3 py-2.5 text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
             value={monitor.scheduleFrequency}
             onChange={(e) => changeFrequency(e.target.value)}
           >
@@ -298,7 +291,7 @@ export function MonitorDetail() {
           </p>
           <button
             onClick={togglePause}
-            className="rounded-md border border-border px-4 py-2 text-sm font-medium text-ink hover:bg-soft"
+            className="btn-secondary"
           >
             {monitor.status === "active" ? "Pause monitor" : "Resume monitor"}
           </button>

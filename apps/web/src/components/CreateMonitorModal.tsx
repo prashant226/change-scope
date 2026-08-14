@@ -30,32 +30,36 @@ export function CreateMonitorModal({ onClose, onCreated }: { onClose: () => void
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
-      <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-lg">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-base font-semibold text-ink">Monitor a webpage</h2>
-          <button onClick={onClose} aria-label="Close" className="text-muted hover:text-ink">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 px-4 backdrop-blur-[2px]">
+      <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-popover">
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-[17px] font-semibold text-ink tracking-tight">Monitor a webpage</h2>
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="rounded-md p-1 text-muted transition-colors hover:bg-soft hover:text-ink"
+          >
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        <label className="block text-xs font-medium text-muted mb-1" htmlFor="monitor-url">
+        <label className="block text-xs font-medium text-muted mb-1.5" htmlFor="monitor-url">
           URL
         </label>
         <input
           id="monitor-url"
-          className="w-full rounded-md border border-border px-3 py-2 text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-primary"
+          className="w-full rounded-lg border border-border px-3 py-2.5 text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
           placeholder="https://example.com/page"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
         />
 
-        <label className="block text-xs font-medium text-muted mb-1" htmlFor="monitor-frequency">
+        <label className="block text-xs font-medium text-muted mb-1.5" htmlFor="monitor-frequency">
           Check frequency
         </label>
         <select
           id="monitor-frequency"
-          className="w-full rounded-md border border-border px-3 py-2 text-sm mb-5 focus:outline-none focus:ring-2 focus:ring-primary"
+          className="w-full rounded-lg border border-border px-3 py-2.5 text-sm mb-6 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
           value={frequency}
           onChange={(e) => setFrequency(e.target.value)}
         >
@@ -69,14 +73,10 @@ export function CreateMonitorModal({ onClose, onCreated }: { onClose: () => void
         {error && <p className="text-sm text-high mb-3">{error}</p>}
 
         <div className="flex justify-end gap-2">
-          <button onClick={onClose} className="rounded-md px-4 py-2 text-sm font-medium text-muted hover:bg-soft">
+          <button onClick={onClose} className="rounded-lg px-4 py-2 text-sm font-medium text-muted transition-colors hover:bg-soft">
             Cancel
           </button>
-          <button
-            onClick={handleSubmit}
-            disabled={submitting || !url.trim()}
-            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-          >
+          <button onClick={handleSubmit} disabled={submitting || !url.trim()} className="btn-primary">
             {submitting ? "Starting…" : "Start monitoring"}
           </button>
         </div>

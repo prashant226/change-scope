@@ -1,15 +1,19 @@
 import type { ReactNode } from "react";
+import { Radar } from "lucide-react";
 
 export function AuthLayout({ title, subtitle, children }: { title: string; subtitle?: string; children: ReactNode }) {
   return (
     <div className="min-h-screen bg-soft flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
-        <div className="text-center mb-8">
-          <span className="text-xl font-semibold text-ink">ChangeScope</span>
+        <div className="flex flex-col items-center gap-2.5 mb-8">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary shadow-sm">
+            <Radar className="h-5 w-5 text-white" strokeWidth={2.25} />
+          </div>
+          <span className="text-lg font-semibold text-ink tracking-tight">ChangeScope</span>
         </div>
-        <div className="rounded-lg border border-border bg-white p-6 shadow-sm">
-          <h1 className="text-lg font-semibold text-ink mb-1">{title}</h1>
-          {subtitle && <p className="text-sm text-muted mb-5">{subtitle}</p>}
+        <div className="card p-7">
+          <h1 className="text-[19px] font-semibold text-ink tracking-tight mb-1">{title}</h1>
+          {subtitle && <p className="text-sm text-muted mb-6">{subtitle}</p>}
           {children}
         </div>
       </div>
@@ -34,7 +38,7 @@ export function AuthField({
 }) {
   return (
     <div className="mb-4">
-      <label htmlFor={id} className="block text-xs font-medium text-muted mb-1">
+      <label htmlFor={id} className="block text-xs font-medium text-muted mb-1.5">
         {label}
       </label>
       <input
@@ -43,7 +47,7 @@ export function AuthField({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         autoComplete={autoComplete}
-        className="w-full rounded-md border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+        className="w-full rounded-lg border border-border px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-shadow"
       />
     </div>
   );

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { api } from "../lib/api";
 import type { AnalyticsSummary } from "../types/api";
+import { PageHeader } from "../components/PageHeader";
 
 // Fixed-order categorical slots (first 5 of the validated 8-hue theme) — used only
 // for "changes by type", where category identity (not status) is what's encoded.
@@ -23,16 +24,16 @@ const IMPACT_COLORS: Record<string, string> = {
 
 function StatCard({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="rounded-lg border border-border bg-white p-5 shadow-sm">
-      <p className="text-xs uppercase tracking-wide text-muted mb-1">{label}</p>
-      <p className="text-2xl font-semibold text-ink">{value}</p>
+    <div className="card p-5">
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted mb-1.5">{label}</p>
+      <p className="text-[28px] font-semibold text-ink tracking-tight">{value}</p>
     </div>
   );
 }
 
 function ChartCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-lg border border-border bg-white p-5 shadow-sm">
+    <div className="card p-5">
       <h2 className="text-sm font-semibold text-ink mb-4">{title}</h2>
       <div className="h-56">{children}</div>
     </div>
@@ -57,10 +58,7 @@ export function Analytics() {
 
   return (
     <div className="max-w-5xl mx-auto py-10 px-6">
-      <header className="mb-6">
-        <h1 className="text-2xl font-semibold text-ink">Analytics</h1>
-        <p className="text-muted mt-1">What is changing, where, and how often?</p>
-      </header>
+      <PageHeader title="Analytics" subtitle="What is changing, where, and how often?" />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <StatCard label="Monitors" value={data.monitorCount} />
@@ -122,18 +120,18 @@ export function Analytics() {
           </ResponsiveContainer>
         </ChartCard>
 
-        <div className="rounded-lg border border-border bg-white p-5 shadow-sm">
+        <div className="card p-5">
           <h2 className="text-sm font-semibold text-ink mb-4">Most changed monitors</h2>
           {data.mostChangedMonitors.length === 0 ? (
             <p className="text-sm text-muted">No changes recorded yet.</p>
           ) : (
-            <ol className="space-y-2">
+            <ol className="space-y-2.5">
               {data.mostChangedMonitors.map((m, i) => (
-                <li key={m.monitorId} className="flex items-center justify-between text-sm">
-                  <span className="text-ink">
+                <li key={m.monitorId} className="flex items-start justify-between gap-4 text-sm">
+                  <span className="text-ink min-w-0 truncate">
                     {i + 1}. {m.title}
                   </span>
-                  <span className="text-muted">{m.changeCount} change(s)</span>
+                  <span className="text-muted shrink-0">{m.changeCount} change(s)</span>
                 </li>
               ))}
             </ol>

@@ -4,9 +4,10 @@ import { api } from "../lib/api";
 import { useRun } from "../hooks/useRun";
 import { AgentTrail } from "../components/AgentTrail";
 import { ChangeCard } from "../components/ChangeCard";
+import { PageHeader } from "../components/PageHeader";
 import { groupByKey } from "../lib/groupChanges";
 import { downloadReportPdf } from "../lib/downloadPdf";
-import { ChevronDown, ChevronRight, Download } from "lucide-react";
+import { ArrowRight, ChevronDown, ChevronRight, Download, Globe } from "lucide-react";
 
 export function Overview() {
   const [url, setUrl] = useState("");
@@ -53,30 +54,34 @@ export function Overview() {
 
   return (
     <div className="max-w-3xl mx-auto py-12 px-6">
-      <header className="mb-8">
-        <h1 className="text-2xl font-semibold text-ink">Web Change Intelligence</h1>
-        <p className="text-muted mt-1">Monitor important changes across the webpages you care about.</p>
-      </header>
+      <PageHeader
+        title="Web Change Intelligence"
+        subtitle="Monitor important changes across the webpages you care about."
+      />
 
-      <div className="rounded-lg border border-border bg-white p-4 shadow-sm mb-4">
+      <div className="card p-5 mb-5">
         <div className="flex gap-2">
-          <input
-            className="flex-1 rounded-md border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            placeholder="Paste a webpage URL…"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleRun()}
-            aria-label="Webpage URL"
-          />
+          <div className="relative flex-1">
+            <Globe className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" strokeWidth={2} />
+            <input
+              className="w-full rounded-lg border border-border pl-10 pr-3 py-2.5 text-[15px] placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-shadow"
+              placeholder="Paste a webpage URL…"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleRun()}
+              aria-label="Webpage URL"
+            />
+          </div>
           <button
             onClick={handleRun}
             disabled={starting || Boolean(isRunning)}
-            className="rounded-md bg-primary px-5 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            className="btn-primary flex items-center gap-1.5 px-6 py-2.5 text-[15px]"
           >
             {starting ? "Starting…" : "Run"}
+            {!starting && <ArrowRight className="h-4 w-4" />}
           </button>
         </div>
-        <p className="text-xs text-muted mt-2">
+        <p className="text-xs text-muted mt-2.5">
           We'll capture the page and compare future runs against the latest successful snapshot.
         </p>
         {startError && <p className="text-sm text-high mt-2">{startError}</p>}
@@ -86,21 +91,24 @@ export function Overview() {
       </div>
 
       {run && (
-        <section className="rounded-lg border border-border bg-white p-5 shadow-sm mb-6">
+        <section className="card p-5 mb-6">
           <h2 className="text-sm font-semibold text-ink mb-4">
             {isRunning ? "Agent is running…" : "Agent Trail"}
           </h2>
           <AgentTrail logs={logs} live={Boolean(isRunning)} />
           {monitorId && !isRunning && (
-            <Link to={`/monitors/${monitorId}`} className="inline-block mt-4 text-sm font-medium text-primary hover:underline">
-              Open full monitor →
+            <Link
+              to={`/monitors/${monitorId}`}
+              className="inline-flex items-center gap-1 mt-4 text-sm font-medium text-primary hover:underline"
+            >
+              Open full monitor <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           )}
         </section>
       )}
 
       {run?.status === "failed" && (
-        <section className="rounded-lg border border-red-200 bg-red-50 p-5">
+        <section className="card border-red-200 bg-red-50 p-5">
           <h2 className="text-base font-semibold text-high mb-1">We couldn't capture this page</h2>
           <p className="text-sm text-ink">{run.error?.message || "The capture failed."}</p>
           <p className="text-sm text-muted mt-2">
@@ -110,7 +118,7 @@ export function Overview() {
       )}
 
       {isFirstRun && (
-        <section className="rounded-lg border border-border bg-white p-5 shadow-sm">
+        <section className="card p-5">
           <h2 className="text-base font-semibold text-ink mb-1">✓ Baseline created</h2>
           <p className="text-sm text-muted">
             We captured this page as your starting snapshot. No comparison is available yet — future runs
@@ -120,7 +128,7 @@ export function Overview() {
       )}
 
       {isNoChange && (
-        <section className="rounded-lg border border-border bg-white p-5 shadow-sm">
+        <section className="card p-5">
           <h2 className="text-base font-semibold text-ink mb-1">✓ No meaningful changes detected</h2>
           <p className="text-sm text-muted">This page is materially unchanged since the last successful snapshot.</p>
           {changes && changes.cosmetic.length > 0 && (
@@ -134,7 +142,7 @@ export function Overview() {
       {changes && changes.meaningful.length > 0 && (
         <section className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-ink">Meaningful changes</h2>
+            <h2 className="text-[15px] font-semibold text-ink">Meaningful changes</h2>
             <button
               onClick={handleDownloadPdf}
               disabled={downloadingPdf}
@@ -162,7 +170,7 @@ export function Overview() {
           {showCosmetic && (
             <div className="mt-3 space-y-3">
               {changes.cosmetic.map((c) => (
-                <div key={c.groupKey} className="rounded-md border border-border p-3 text-sm">
+                <div key={c.groupKey} className="rounded-lg border border-border p-3 text-sm">
                   <p className="text-ink">{c.elementLabel || c.groupTitle}: {c.beforeValue} → {c.afterValue}</p>
                   <p className="text-muted text-xs mt-1">Classification: {c.classification}. {c.whyItMatters}</p>
                 </div>
