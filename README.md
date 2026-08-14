@@ -5,10 +5,9 @@ language — what actually changed and why it might matter. It is not a diff vie
 real content/functional changes from CSS noise and uses an LLM only to reason about *significance*,
 never to discover facts.
 
-> **Status: core vertical slice.** URL → capture → snapshot → diff → AI reasoning → report works
-> end to end (see "What's built" below). Auth, scheduler, history/analytics UI, and the
-> Supabase-backed persistence layer are scaffolded but not all wired up yet — see [Known
-> limitations](#known-limitations).
+> **Status: core product working.** URL → capture → snapshot → diff → AI reasoning → report works
+> end to end, with Monitors/Monitor Detail/History/Analytics pages and optional Supabase
+> persistence. Auth and the scheduler aren't wired up yet — see [Known limitations](#known-limitations).
 
 ## Product use case
 
@@ -63,8 +62,9 @@ matters* and *why*. See `apps/server/src/diff`, `classifier`, and `ai` for the b
 - **Browser automation:** Playwright (Chromium)
 - **AI:** OpenAI Responses API, GPT-5 mini, strict JSON-schema output validated with Zod
 - **Diff:** custom deterministic TypeScript (no LLM involved)
-- **Database/Storage/Auth (planned wiring):** Supabase Postgres, Storage, Auth — see
-  [Known limitations](#known-limitations)
+- **Database/Storage:** Supabase Postgres + Storage (optional — falls back to an in-memory store
+  when not configured; see below)
+- **Auth (planned wiring):** Supabase Auth — see [Known limitations](#known-limitations)
 
 No Redis, no queues, no vector DB — see `docs/supabase-storage-todo.md` for what's intentionally
 deferred.
@@ -87,8 +87,8 @@ docs/            architecture notes, follow-up TODOs
 
 ### Prerequisites
 - Node.js 18+
-- An OpenAI API key (optional for now — the app runs and shows deterministic results without one)
-- A Supabase project (optional for now — see limitations)
+- An OpenAI API key (optional — the app runs and shows deterministic results without one)
+- A Supabase project (optional — falls back to an in-memory store that doesn't survive a restart)
 
 ### Install
 
@@ -96,6 +96,18 @@ docs/            architecture notes, follow-up TODOs
 npm install
 npx playwright install chromium --with-deps   # from apps/server, or run once at repo root
 ```
+
+### Supabase setup (optional but recommended)
+
+1. Create a free project at [supabase.com](https://supabase.com) → **New Project**.
+2. In **Project Settings → API**, copy the **Project URL**, **anon public** key, and
+   **service_role** key (click "Reveal").
+3. In the **SQL Editor**, run `supabase/migrations/0001_init.sql`, then
+   `supabase/seed/storage_buckets.sql`.
+4. Put the three keys into `apps/server/.env` (see below).
+
+Without this, the app runs on an in-memory store — fine for a quick local demo, but monitors/runs
+are lost on every server restart.
 
 ### Environment variables
 
@@ -108,7 +120,7 @@ cp .env.example apps/server/.env
 | Variable | Purpose |
 |---|---|
 | `OPENAI_API_KEY` | Enables AI significance reasoning. Without it, runs still work — the UI shows "AI significance analysis is temporarily unavailable" and deterministic facts still display. |
-| `SUPABASE_URL` / `SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY` | Not yet consumed by the storage layer (see limitations). Reserved for the Supabase-backed `StorageAdapter`. |
+| `SUPABASE_URL` / `SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY` | Enables persistent storage (Postgres + Storage buckets) via `SupabaseStore`. Without these, the server uses an in-memory store instead — same behavior, no persistence across restarts. `SUPABASE_ANON_KEY` is reserved for the frontend once Supabase Auth is wired up; the server currently only needs the service-role key. |
 | `PORT`, `FRONTEND_URL` | Server port and CORS origin. |
 | `MAX_BROWSER_CONCURRENCY`, `MAX_RUNS_PER_USER`, `RUN_COOLDOWN_SECONDS`, `AI_CONTEXT_TOKEN_BUDGET`, `PAGE_CAPTURE_TIMEOUT_MS`, `MAX_SCROLL_DURATION_MS`, `MAX_SCROLL_STEPS`, `AI_RETRY_COUNT`, `AI_RETRY_DELAY_MS` | Performance guardrails, all overridable — see `apps/server/src/utils/config.ts`. |
 
@@ -131,39 +143,38 @@ again (after the cooldown) to see a comparison.
 npm run test:unit --workspace apps/server
 ```
 
-21 unit tests cover: the diff engine (numeric/text/structural/functional/visual/media changes,
-grouping, reordering, semantic-equivalent whitespace, unchanged elements), SSRF/URL validation
-(blocked schemes, localhost, loopback, private IP ranges, cloud metadata IP), and the AI reasoning
-layer (schema validation, no-API-key fallback, empty-group short-circuit).
+22 unit tests cover: the diff engine (numeric/text/structural/functional/visual/media changes,
+grouping, reordering, semantic-equivalent whitespace, unchanged elements, duplicate non-identifying
+hrefs like `href="#"`), SSRF/URL validation (blocked schemes, localhost, loopback, private IP
+ranges, cloud metadata IP), and the AI reasoning layer (schema validation, no-API-key fallback,
+empty-group short-circuit).
 
 ## Demo auth
 
-Not wired up yet in this pass — the API runs behind a single fixed demo user id
-(`DEMO_USER_ID` in `apps/server/src/utils/config.ts`) so the vertical slice can be exercised
-without login. Supabase Auth email/password screens are the next layer to add (see limitations).
+Not wired up yet — the API runs behind a single fixed demo user id so the app can be exercised
+without login. See [Known limitations](#known-limitations) for what that means for the schema.
 
 ## Known limitations
 
-This is the core vertical slice (§91 in the design spec — build incrementally, prove the slice
-first). Not yet implemented:
+Built incrementally per §91 in the design spec — the core agentic loop and product screens work
+end to end. Not yet implemented:
 
-- **Supabase persistence.** The app currently runs on an in-process `MemoryStore`
-  (`apps/server/src/storage/memoryStore.ts`) behind the same `StorageAdapter` interface a
-  Supabase-backed store will satisfy — nothing in the orchestrator or API depends on which one is
-  used. Data does not survive a server restart. Migration SQL is ready in `supabase/migrations/`;
-  see `docs/supabase-storage-todo.md` for the remaining wiring steps.
-- **Auth screens** (login/signup/forgot-password) and real Supabase Auth.
+- **Auth screens** (login/signup/forgot-password) and real Supabase Auth. The API runs behind a
+  single fixed demo user id (`DEMO_USER_ID` in `apps/server/src/utils/config.ts`). Because of this,
+  `monitored_urls.user_id` / `runs.user_id` are plain `uuid` columns with no FK to `auth.users` yet
+  (a real FK would reject every insert against a user that doesn't exist) — see
+  `docs/supabase-storage-todo.md` for the one-line migration to add once auth ships.
 - **Realtime updates** — the frontend currently polls `/api/runs/:id` every ~1.2s rather than
   subscribing to Supabase Realtime (§64's required fallback path, used as the primary path here).
-- **Monitors / History / Analytics / Settings pages** — sidebar links are present but only
-  Overview is functional today; the API endpoints for these exist (`/api/monitors`, `/history`,
-  `/api/analytics`) and are unit-testable, just not yet rendered.
-- **Scheduler** (node-cron) — not started; schedule fields exist on the monitor record.
-- **Screenshot storage / visual preview** — screenshots are captured by Playwright but held in
-  memory, not yet persisted to Supabase Storage or shown in the UI.
+- **Scheduler** (node-cron) — not started; schedule fields exist on the monitor record and are
+  editable from Settings, but nothing triggers a run automatically yet. "Run now" always works.
+- **Visual preview** — screenshots are captured by Playwright and uploaded to Supabase Storage
+  when configured, but nothing in the UI displays them yet (paths are on the `snapshots` row,
+  ready for that feature).
 
 None of these affect the core agentic loop (capture → snapshot → diff → classify → group → AI
-reason → report), which is fully working and generic.
+reason → report) or the Overview/Monitors/Monitor Detail/History/Analytics screens, which are
+fully working and generic.
 
 ## Why these choices
 
