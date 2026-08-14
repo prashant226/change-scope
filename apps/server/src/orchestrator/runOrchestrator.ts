@@ -25,11 +25,32 @@ function contentHash(snapshotData: unknown): string {
   return createHash("sha1").update(JSON.stringify(snapshotData)).digest("hex");
 }
 
+/**
+ * Every log entry doubles as the source for two frontend views: the plain-
+ * language Agent Trail (action/reason) and the technical Live Execution
+ * Trace (metadata). `metadata` only ever carries values this module actually
+ * measured — never a fabricated number to make the trace look busier.
+ *
+ * durationMs is computed automatically: whichever stage logged "in_progress"
+ * most recently, the next "completed"/"failed" entry for that same stage
+ * gets stamped with real elapsed time. No stage needs to track this by hand.
+ */
 class RunLogger {
   private sequence = 0;
+  private stageStartedAt = new Map<RunStage, number>();
   constructor(private runId: string) {}
 
   async log(stage: RunStage, action: string, reason: string, status: AgentLogEntry["status"], metadata?: Record<string, unknown>) {
+    let meta = metadata;
+    if (status === "in_progress") {
+      this.stageStartedAt.set(stage, Date.now());
+    } else {
+      const startedAt = this.stageStartedAt.get(stage);
+      if (startedAt !== undefined) {
+        meta = { ...metadata, durationMs: Date.now() - startedAt };
+      }
+    }
+
     const entry: AgentLogEntry = {
       sequence: this.sequence++,
       timestamp: new Date().toISOString(),
@@ -37,7 +58,7 @@ class RunLogger {
       action,
       reason,
       status,
-      metadata,
+      metadata: meta,
     };
     await store.appendLog(this.runId, entry);
     return entry;
@@ -54,7 +75,9 @@ export async function executeRun(runId: string): Promise<void> {
   await store.updateRun(runId, { status: "running" });
 
   try {
-    await logger.log("validating_url", "URL validated", "Checking whether the submitted target can be processed.", "completed");
+    await logger.log("validating_url", "URL validated", "Checking whether the submitted target can be processed.", "completed", {
+      url: monitor.url,
+    });
 
     await logger.log(
       "finding_previous_snapshot",
@@ -70,9 +93,12 @@ export async function executeRun(runId: string): Promise<void> {
         ? "Using the latest successful snapshot as the comparison baseline."
         : "This is the first successful run — a baseline will be created instead of a comparison.",
       "completed",
+      previousSnapshot ? { previousVersion: previousSnapshot.versionNumber } : { previousVersion: null },
     );
 
-    await logger.log("opening_page", "Opening the page", "Rendering the target URL in an isolated browser context.", "in_progress");
+    await logger.log("opening_page", "Opening the page", "Rendering the target URL in an isolated browser context.", "in_progress", {
+      url: monitor.url,
+    });
     const capture = await capturePage(monitor.url, {
       timeoutMs: config.pageCaptureTimeoutMs,
       maxScrollDurationMs: config.maxScrollDurationMs,
@@ -80,7 +106,9 @@ export async function executeRun(runId: string): Promise<void> {
     });
 
     if (!capture.ok) {
-      await logger.log("opening_page", "Page capture failed", capture.error.message, "failed");
+      await logger.log("opening_page", "Page capture failed", capture.error.message, "failed", {
+        errorCode: capture.error.code,
+      });
       await store.updateRun(runId, {
         status: "failed",
         captureStatus: "failed",
@@ -93,12 +121,20 @@ export async function executeRun(runId: string): Promise<void> {
       });
       return; // Failed capture NEVER becomes the new baseline (§7, §61).
     }
-    await logger.log("rendering", "Page rendered", "Waited for meaningful content before capturing.", "completed");
+    await logger.log("rendering", "Page rendered", "Waited for meaningful content before capturing.", "completed", {
+      finalUrl: capture.finalUrl,
+      pageTitle: capture.title,
+    });
     await logger.log("capturing", "Snapshot captured", "Current webpage state was recorded.", "completed");
 
     await logger.log("building_snapshot", "Building generic snapshot", "Converting captured page state into the generic snapshot schema.", "in_progress");
     const snapshotData = buildSnapshot(monitor.url, capture);
-    await logger.log("building_snapshot", "Snapshot built", `Detected ${snapshotData.stats.sectionCount} sections and ${snapshotData.stats.contentElementCount} content elements.`, "completed");
+    await logger.log("building_snapshot", "Snapshot built", `Detected ${snapshotData.stats.sectionCount} sections and ${snapshotData.stats.contentElementCount} content elements.`, "completed", {
+      sections: snapshotData.stats.sectionCount,
+      contentElements: snapshotData.stats.contentElementCount,
+      interactiveElements: snapshotData.stats.interactiveElementCount,
+      media: snapshotData.stats.imageCount,
+    });
 
     await logger.log("saving_snapshot", "Saving snapshot", "Persisting the snapshot as the new most-recent version.", "in_progress");
     const versionNumber = (await store.listSnapshotsForMonitor(monitor.id)).length + 1;
@@ -112,7 +148,9 @@ export async function executeRun(runId: string): Promise<void> {
       rawHtml: capture.html,
       isSuccessful: true,
     });
-    await logger.log("saving_snapshot", "Snapshot saved", `Stored as version ${versionNumber}.`, "completed");
+    await logger.log("saving_snapshot", "Snapshot saved", `Stored as version ${versionNumber}.`, "completed", {
+      versionNumber,
+    });
 
     await store.updateMonitor(monitor.id, {
       title: monitor.title || snapshotData.metadata.title,
@@ -122,7 +160,9 @@ export async function executeRun(runId: string): Promise<void> {
     });
 
     if (!previousSnapshot) {
-      await logger.log("building_report", "Baseline report generated", "Converting the captured page state into a baseline report — nothing to compare against yet.", "completed");
+      await logger.log("building_report", "Baseline report generated", "Converting the captured page state into a baseline report — nothing to compare against yet.", "completed", {
+        type: "baseline",
+      });
       await store.updateRun(runId, {
         status: "completed",
         reportType: determineReportType(false),
@@ -136,13 +176,20 @@ export async function executeRun(runId: string): Promise<void> {
 
     await logger.log("comparing", "Comparing snapshots", "Detecting differences between current and previous page state.", "in_progress");
     const rawChanges = diffSnapshots(previousSnapshot.snapshot, snapshotData);
-    await logger.log("comparing", "Comparison complete", `Found ${rawChanges.length} raw difference(s).`, "completed");
+    await logger.log("comparing", "Comparison complete", `Found ${rawChanges.length} raw difference(s).`, "completed", {
+      rawDifferences: rawChanges.length,
+    });
 
+    const classificationCounts = rawChanges.reduce<Record<string, number>>((acc, c) => {
+      acc[c.classification] = (acc[c.classification] || 0) + 1;
+      return acc;
+    }, {});
     await logger.log(
       "classifying",
       "Changes classified",
       "Separating content, functional, structural, visual and media differences.",
       "completed",
+      classificationCounts,
     );
 
     // CSS-only changes are pulled out here, before grouping — they're not
@@ -152,9 +199,15 @@ export async function executeRun(runId: string): Promise<void> {
 
     await logger.log("grouping", "Grouping related changes", "Clustering low-level differences into higher-level events by section.", "in_progress");
     const groups = groupChanges(candidates);
-    await logger.log("grouping", "Grouping complete", `Formed ${groups.length} change group(s), plus ${cosmetic.length} cosmetic change(s) set aside.`, "completed");
+    await logger.log("grouping", "Grouping complete", `Formed ${groups.length} change group(s), plus ${cosmetic.length} cosmetic change(s) set aside.`, "completed", {
+      candidateGroups: groups.length,
+      cosmeticExcluded: cosmetic.length,
+    });
 
-    await logger.log("ai_reasoning", "AI analysis started", "Interpreting ambiguous changes and their potential significance.", "in_progress");
+    await logger.log("ai_reasoning", "AI analysis started", "Interpreting ambiguous changes and their potential significance.", "in_progress", {
+      model: groups.length > 0 ? "gpt-5-mini" : undefined,
+      groupsSubmitted: groups.length,
+    });
     const reasonResult = await reasonAboutChanges(groups, snapshotData.metadata.title, {
       apiKey: config.openaiApiKey,
       tokenBudget: config.aiContextTokenBudget,
@@ -168,6 +221,7 @@ export async function executeRun(runId: string): Promise<void> {
         ? "The AI significance step failed; showing deterministic facts without interpretation."
         : "Significance and grouping explanations generated for each change.",
       reasonResult.aiUnavailable ? "failed" : "completed",
+      { ...reasonResult.metrics },
     );
 
     await logger.log("building_report", "Comparison report generated", "Converting analyzed changes into the final user-facing report.", "in_progress");
@@ -175,7 +229,10 @@ export async function executeRun(runId: string): Promise<void> {
     await store.saveChanges(runId, allChanges);
 
     const { meaningful: meaningfulCount, cosmetic: cosmeticCount } = countGroups(allChanges);
-    await logger.log("building_report", "Report ready", `${meaningfulCount} meaningful change(s), ${cosmeticCount} cosmetic change(s) excluded from the summary.`, "completed");
+    await logger.log("building_report", "Report ready", `${meaningfulCount} meaningful change(s), ${cosmeticCount} cosmetic change(s) excluded from the summary.`, "completed", {
+      meaningfulChanges: meaningfulCount,
+      cosmeticChanges: cosmeticCount,
+    });
 
     await store.updateRun(runId, {
       status: reasonResult.aiUnavailable ? "partial" : "completed",

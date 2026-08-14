@@ -45,6 +45,12 @@ export interface ReasonResult {
   ok: boolean;
   changes: AnalyzedChange[];
   aiUnavailable: boolean;
+  /** Real, measured values only — for the technical execution trace. Fields are omitted, never faked, when not actually known at that point. */
+  metrics: {
+    model: string;
+    groupsSubmitted: number;
+    contextTokensApprox?: number;
+  };
 }
 
 function fallback(groups: ChangeGroup[]): AnalyzedChange[] {
@@ -83,14 +89,18 @@ export async function reasonAboutChanges(
   options: { apiKey?: string; tokenBudget: number; retryCount: number; retryDelayMs: number },
 ): Promise<ReasonResult> {
   if (groups.length === 0) {
-    return { ok: true, changes: [], aiUnavailable: false };
+    return { ok: true, changes: [], aiUnavailable: false, metrics: { model: MODEL, groupsSubmitted: 0 } };
   }
   if (!options.apiKey) {
-    return { ok: false, changes: fallback(groups), aiUnavailable: true };
+    return { ok: false, changes: fallback(groups), aiUnavailable: true, metrics: { model: MODEL, groupsSubmitted: groups.length } };
   }
 
   const client = new OpenAI({ apiKey: options.apiKey });
   const context = buildAiContext(groups, pageTitle, options.tokenBudget);
+  // Rough 4-chars-per-token heuristic, same one buildAiContext uses for its budget check —
+  // a real measured estimate of what was actually sent, not a guess pulled from nowhere.
+  const contextTokensApprox = Math.round(JSON.stringify(context).length / 4);
+  const metrics = { model: MODEL, groupsSubmitted: groups.length, contextTokensApprox };
 
   let lastError: unknown;
   for (let attempt = 0; attempt <= options.retryCount; attempt++) {
@@ -113,7 +123,7 @@ export async function reasonAboutChanges(
 
       const raw = response.output_text;
       const parsed = aiResponseSchema.parse(JSON.parse(raw));
-      return { ok: true, changes: mergeAiResults(groups, parsed.changes), aiUnavailable: false };
+      return { ok: true, changes: mergeAiResults(groups, parsed.changes), aiUnavailable: false, metrics };
     } catch (err) {
       lastError = err;
       if (attempt < options.retryCount) {
@@ -123,7 +133,7 @@ export async function reasonAboutChanges(
   }
 
   console.error("[ai/reason] OpenAI call failed after retries:", lastError);
-  return { ok: false, changes: fallback(groups), aiUnavailable: true };
+  return { ok: false, changes: fallback(groups), aiUnavailable: true, metrics };
 }
 
 function mergeAiResults(

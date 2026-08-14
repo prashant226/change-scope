@@ -4,6 +4,7 @@ import type { MonitorRecord, RunRecord, SnapshotSummary, AnalyzedChange } from "
 import { api } from "../lib/api";
 import { useRun } from "../hooks/useRun";
 import { AgentTrail } from "../components/AgentTrail";
+import { LiveExecutionTrace } from "../components/LiveExecutionTrace";
 import { ChangeCard } from "../components/ChangeCard";
 import { ReportSummary } from "../components/ReportSummary";
 import { BaselineReport } from "../components/BaselineReport";
@@ -184,9 +185,12 @@ export function MonitorDetail() {
       {tab === "changes" && (
         <section>
           {isRunning && (
-            <div className="card p-5 mb-6">
-              <h2 className="text-sm font-semibold text-ink mb-4">Agent is running…</h2>
-              <AgentTrail logs={liveLogs} live />
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6 items-start">
+              <div className="card p-5">
+                <h2 className="text-sm font-semibold text-ink mb-4">Agent is running…</h2>
+                <AgentTrail logs={liveLogs} live />
+              </div>
+              <LiveExecutionTrace logs={liveLogs} live />
             </div>
           )}
 
@@ -274,12 +278,15 @@ export function MonitorDetail() {
       )}
 
       {tab === "trail" && (
-        <section className="card p-5">
-          {displayLogs.length === 0 ? (
-            <p className="text-sm text-muted">No agent activity recorded yet.</p>
-          ) : (
-            <AgentTrail logs={displayLogs} live={Boolean(isRunning)} />
-          )}
+        <section className="space-y-4">
+          <div className="card p-5">
+            {displayLogs.length === 0 ? (
+              <p className="text-sm text-muted">No agent activity recorded yet.</p>
+            ) : (
+              <AgentTrail logs={displayLogs} live={Boolean(isRunning)} />
+            )}
+          </div>
+          {displayLogs.length > 0 && <LiveExecutionTrace logs={displayLogs} live={Boolean(isRunning)} />}
         </section>
       )}
 
