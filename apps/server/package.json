@@ -9,7 +9,8 @@
     "start": "node dist/index.js",
     "test": "vitest run",
     "test:unit": "vitest run tests-unit",
-    "playwright:install": "playwright install chromium"
+    "playwright:install": "playwright install chromium",
+    "seed:demo-user": "tsx scripts/seedDemoUser.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",

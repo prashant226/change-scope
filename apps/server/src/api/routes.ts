@@ -6,15 +6,16 @@ import { executeRun } from "../orchestrator/runOrchestrator.js";
 import { canStartRun, markRunStarted, markRunFinished } from "./rateLimit.js";
 import { buildAnalytics } from "../reports/analytics.js";
 import { buildMonitorSummaries, buildMonitorSummary } from "../reports/monitorSummary.js";
-import { DEMO_USER_ID } from "../utils/config.js";
 import type { ScheduleFrequency } from "../storage/types.js";
 
 const router = Router();
 const store = getStore();
 
-/** Single-demo-user auth stand-in until Supabase Auth is wired up (§68). */
-function currentUserId(_req: unknown): string {
-  return DEMO_USER_ID;
+/** Fetches a monitor and 404s (never 403 — avoids confirming other users' monitor ids exist) unless it belongs to the caller. */
+async function getOwnedMonitor(userId: string, monitorId: string) {
+  const monitor = await store.getMonitor(monitorId);
+  if (!monitor || monitor.userId !== userId) return undefined;
+  return monitor;
 }
 
 async function triggerRun(userId: string, monitorId: string, triggerType: "manual" | "scheduled") {
@@ -49,7 +50,7 @@ router.post("/monitors", async (req, res) => {
   const syntax = validateUrlSyntax(url);
   if (!syntax.ok) return res.status(400).json({ error: syntax.reason });
 
-  const userId = currentUserId(req);
+  const userId = req.userId;
   const normalized = normalizeUrl(url);
   const existing = await store.findMonitorByNormalizedUrl(userId, normalized);
   if (existing) {
@@ -67,24 +68,28 @@ router.post("/monitors", async (req, res) => {
 });
 
 router.get("/monitors", async (req, res) => {
-  const monitors = await store.listMonitors(currentUserId(req));
+  const monitors = await store.listMonitors(req.userId);
   const summaries = await buildMonitorSummaries(store, monitors);
   res.json({ monitors: summaries });
 });
 
 router.get("/monitors/:id", async (req, res) => {
-  const monitor = await store.getMonitor(req.params.id);
+  const monitor = await getOwnedMonitor(req.userId, req.params.id);
   if (!monitor) return res.status(404).json({ error: "Monitor not found" });
   const summary = await buildMonitorSummary(store, monitor);
   res.json({ monitor: summary });
 });
 
 router.patch("/monitors/:id", async (req, res) => {
-  const monitor = await store.updateMonitor(req.params.id, req.body);
-  res.json({ monitor });
+  const monitor = await getOwnedMonitor(req.userId, req.params.id);
+  if (!monitor) return res.status(404).json({ error: "Monitor not found" });
+  const updated = await store.updateMonitor(req.params.id, req.body);
+  res.json({ monitor: updated });
 });
 
 router.get("/monitors/:id/history", async (req, res) => {
+  const monitor = await getOwnedMonitor(req.userId, req.params.id);
+  if (!monitor) return res.status(404).json({ error: "Monitor not found" });
   const snapshots = await store.listSnapshotsForMonitor(req.params.id);
   const runs = await store.listRunsForMonitor(req.params.id);
   res.json({
@@ -98,9 +103,9 @@ router.get("/monitors/:id/history", async (req, res) => {
 
 // POST /api/monitors/:id/run — manual re-run of an existing monitor.
 router.post("/monitors/:id/run", async (req, res) => {
-  const monitor = await store.getMonitor(req.params.id);
+  const monitor = await getOwnedMonitor(req.userId, req.params.id);
   if (!monitor) return res.status(404).json({ error: "Monitor not found" });
-  const result = await triggerRun(currentUserId(req), monitor.id, "manual");
+  const result = await triggerRun(req.userId, monitor.id, "manual");
   if ("error" in result) return res.status(429).json({ error: result.error });
   res.status(202).json({ runId: result.run.id });
 });
@@ -113,7 +118,7 @@ router.post("/runs", async (req, res) => {
   const syntax = validateUrlSyntax(url);
   if (!syntax.ok) return res.status(400).json({ error: syntax.reason });
 
-  const userId = currentUserId(req);
+  const userId = req.userId;
   const normalized = normalizeUrl(url);
   let monitor = await store.findMonitorByNormalizedUrl(userId, normalized);
   const alreadyMonitored = Boolean(monitor);
@@ -130,11 +135,13 @@ router.post("/runs", async (req, res) => {
 
 router.get("/runs/:id", async (req, res) => {
   const run = await store.getRun(req.params.id);
-  if (!run) return res.status(404).json({ error: "Run not found" });
+  if (!run || run.userId !== req.userId) return res.status(404).json({ error: "Run not found" });
   res.json({ run });
 });
 
 router.get("/runs/:id/changes", async (req, res) => {
+  const run = await store.getRun(req.params.id);
+  if (!run || run.userId !== req.userId) return res.status(404).json({ error: "Run not found" });
   const changes = await store.getChanges(req.params.id);
   const meaningful = changes
     .filter((c) => c.meaningful)
@@ -144,12 +151,14 @@ router.get("/runs/:id/changes", async (req, res) => {
 });
 
 router.get("/runs/:id/logs", async (req, res) => {
+  const run = await store.getRun(req.params.id);
+  if (!run || run.userId !== req.userId) return res.status(404).json({ error: "Run not found" });
   const logs = await store.getLogs(req.params.id);
   res.json({ logs });
 });
 
 router.get("/analytics", async (req, res) => {
-  const summary = await buildAnalytics(store, currentUserId(req));
+  const summary = await buildAnalytics(store, req.userId);
   res.json(summary);
 });
 

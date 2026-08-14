@@ -6,9 +6,9 @@ real content/functional changes from CSS noise and uses an LLM only to reason ab
 never to discover facts.
 
 > **Status: core product working.** URL → capture → snapshot → diff → AI reasoning → report works
-> end to end, with Monitors/Monitor Detail/History/Analytics pages. Supabase persistence is wired
-> up and verified against a real project (data + screenshots survive a server restart). Auth and
-> the scheduler aren't wired up yet — see [Known limitations](#known-limitations).
+> end to end, with Monitors/Monitor Detail/History/Analytics pages, real Supabase persistence, and
+> real Supabase Auth (login/signup/forgot-password, per-user data isolation) — all verified against
+> a live project. Only the scheduler isn't wired up yet — see [Known limitations](#known-limitations).
 
 ## Product use case
 
@@ -103,27 +103,40 @@ npx playwright install chromium --with-deps   # from apps/server, or run once at
 1. Create a free project at [supabase.com](https://supabase.com) → **New Project**.
 2. In **Project Settings → API**, copy the **Project URL**, **anon public** key, and
    **service_role** key (click "Reveal").
-3. In the **SQL Editor**, run `supabase/migrations/0001_init.sql`, then
-   `supabase/seed/storage_buckets.sql`.
-4. Put the three keys into `apps/server/.env` (see below).
+3. In the **SQL Editor**, run, in order: `supabase/migrations/0001_init.sql`,
+   `supabase/migrations/0002_tighten_user_fk.sql`, then `supabase/seed/storage_buckets.sql`.
+4. Put the three keys into `apps/server/.env` (see below) **and** the URL + anon key into
+   `apps/web/.env` as `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` (safe to expose client-side —
+   see `apps/web/.env.example`).
 
-Without this, the app runs on an in-memory store — fine for a quick local demo, but monitors/runs
-are lost on every server restart.
+Without this, the app runs on an in-memory store with no login — fine for a quick local demo, but
+monitors/runs are lost on every server restart and there's no user isolation.
 
 ### Environment variables
 
-Copy `.env.example` to `apps/server/.env` and fill in what you have:
+Copy `.env.example` to `apps/server/.env` and `apps/web/.env.example` to `apps/web/.env`, then fill
+in what you have:
 
 ```bash
 cp .env.example apps/server/.env
+cp apps/web/.env.example apps/web/.env
 ```
+
+**Server** (`apps/server/.env`):
 
 | Variable | Purpose |
 |---|---|
 | `OPENAI_API_KEY` | Enables AI significance reasoning. Without it, runs still work — the UI shows "AI significance analysis is temporarily unavailable" and deterministic facts still display. |
-| `SUPABASE_URL` / `SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY` | Enables persistent storage (Postgres + Storage buckets) via `SupabaseStore`. Without these, the server uses an in-memory store instead — same behavior, no persistence across restarts. `SUPABASE_ANON_KEY` is reserved for the frontend once Supabase Auth is wired up; the server currently only needs the service-role key. |
+| `SUPABASE_URL` / `SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY` | Enables persistent storage (Postgres + Storage buckets) via `SupabaseStore`, **and** enables real auth enforcement on every API route. Without these, the server uses an in-memory store and a single fixed demo user id instead — no persistence, no login required. |
+| `DEMO_USER_EMAIL` / `DEMO_USER_PASSWORD` | Optional — run `npm run seed:demo-user --workspace apps/server` to create a pre-confirmed demo account via the Supabase Admin API (password must be 8+ characters). Otherwise, just sign up through the app's Signup page. |
 | `PORT`, `FRONTEND_URL` | Server port and CORS origin. |
 | `MAX_BROWSER_CONCURRENCY`, `MAX_RUNS_PER_USER`, `RUN_COOLDOWN_SECONDS`, `AI_CONTEXT_TOKEN_BUDGET`, `PAGE_CAPTURE_TIMEOUT_MS`, `MAX_SCROLL_DURATION_MS`, `MAX_SCROLL_STEPS`, `AI_RETRY_COUNT`, `AI_RETRY_DELAY_MS` | Performance guardrails, all overridable — see `apps/server/src/utils/config.ts`. |
+
+**Web** (`apps/web/.env`):
+
+| Variable | Purpose |
+|---|---|
+| `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` | Needed for the Login/Signup/Forgot-password screens to talk to Supabase Auth directly. Without these, auth screens will show a console warning and fail to sign in. |
 
 ### Run locally
 
@@ -135,8 +148,10 @@ npm run dev:server   # http://localhost:4000
 npm run dev:web      # http://localhost:5173 (proxies /api to :4000)
 ```
 
-Open http://localhost:5173, paste a public URL, click **Run**. First run creates a baseline; run
-again (after the cooldown) to see a comparison.
+Open http://localhost:5173. If Supabase is configured, you'll land on the Login screen — click
+"Create account" to sign up (or use the seeded demo account, or sign in with an existing one).
+Then paste a public URL and click **Run**. First run creates a baseline; run again (after the
+cooldown) to see a comparison.
 
 ### Testing
 
@@ -152,19 +167,26 @@ empty-group short-circuit).
 
 ## Demo auth
 
-Not wired up yet — the API runs behind a single fixed demo user id so the app can be exercised
-without login. See [Known limitations](#known-limitations) for what that means for the schema.
+Real Supabase Auth — email/password, with Login/Signup/Forgot-password/Reset-password screens.
+For a quick demo login without going through signup:
+
+```bash
+# with DEMO_USER_EMAIL / DEMO_USER_PASSWORD set in apps/server/.env
+npm run seed:demo-user --workspace apps/server
+```
+
+This creates a pre-confirmed account via the Supabase Admin API (or resets its password if it
+already exists) — no email confirmation step needed. Never commit a real password for this; it's
+meant for local/demo use only.
+
+If Supabase isn't configured at all, the API falls back to one fixed demo user id and skips auth
+entirely, so the core flow can still be exercised with zero setup.
 
 ## Known limitations
 
 Built incrementally per §91 in the design spec — the core agentic loop and product screens work
 end to end. Not yet implemented:
 
-- **Auth screens** (login/signup/forgot-password) and real Supabase Auth. The API runs behind a
-  single fixed demo user id (`DEMO_USER_ID` in `apps/server/src/utils/config.ts`). Because of this,
-  `monitored_urls.user_id` / `runs.user_id` are plain `uuid` columns with no FK to `auth.users` yet
-  (a real FK would reject every insert against a user that doesn't exist) — see
-  `docs/supabase-storage-todo.md` for the one-line migration to add once auth ships.
 - **Realtime updates** — the frontend currently polls `/api/runs/:id` every ~1.2s rather than
   subscribing to Supabase Realtime (§64's required fallback path, used as the primary path here).
 - **Scheduler** (node-cron) — not started; schedule fields exist on the monitor record and are

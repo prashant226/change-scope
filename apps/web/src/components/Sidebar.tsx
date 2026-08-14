@@ -1,5 +1,6 @@
-import { NavLink } from "react-router-dom";
-import { Activity, BarChart3, History, LayoutGrid, ListChecks, Settings } from "lucide-react";
+import { NavLink, useNavigate } from "react-router-dom";
+import { Activity, BarChart3, History, LayoutGrid, ListChecks, LogOut, Settings } from "lucide-react";
+import { useAuth } from "../contexts/AuthContext";
 
 const NAV_ITEMS = [
   { to: "/", label: "Overview", icon: LayoutGrid, end: true },
@@ -15,6 +16,14 @@ function navClass(active: boolean) {
 }
 
 export function Sidebar() {
+  const { session, signOut } = useAuth();
+  const navigate = useNavigate();
+
+  async function handleSignOut() {
+    await signOut();
+    navigate("/login", { replace: true });
+  }
+
   return (
     <aside className="w-56 shrink-0 border-r border-border bg-white flex flex-col">
       <div className="px-5 py-5">
@@ -33,11 +42,23 @@ export function Sidebar() {
           Activity
         </div>
       </nav>
-      <div className="px-3 pb-4">
+      <div className="px-3 pb-4 border-t border-border pt-3">
+        {session?.user?.email && (
+          <p className="px-3 text-xs text-muted truncate mb-1" title={session.user.email}>
+            {session.user.email}
+          </p>
+        )}
         <div className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-muted">
           <Settings className="h-4 w-4" />
           Settings
         </div>
+        <button
+          onClick={handleSignOut}
+          className="w-full flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-muted hover:bg-soft hover:text-ink"
+        >
+          <LogOut className="h-4 w-4" />
+          Sign out
+        </button>
       </div>
     </aside>
   );

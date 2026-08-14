@@ -2,6 +2,7 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import routes from "./api/routes.js";
+import { requireAuth } from "./api/authMiddleware.js";
 import { config } from "./utils/config.js";
 import { closeBrowser } from "./browser/capture.js";
 
@@ -10,7 +11,7 @@ app.use(cors({ origin: config.frontendUrl }));
 app.use(express.json({ limit: "2mb" }));
 
 app.get("/health", (_req, res) => res.json({ ok: true }));
-app.use("/api", routes);
+app.use("/api", requireAuth, routes);
 
 app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error("[server] Unhandled error:", err);

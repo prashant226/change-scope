@@ -14,23 +14,23 @@ screenshots/raw HTML to Supabase Storage instead of holding them in memory.
 5. Restart the server. `storage/index.ts` picks `SupabaseStore` automatically
    once both env vars are present — nothing else needs to change.
 
-## Known temporary compromise: `user_id` has no FK to `auth.users`
+## `user_id` FK to `auth.users` — resolved
 
-Supabase Auth isn't wired up yet (see README limitations), so the server runs
-behind one fixed demo user id (`DEMO_USER_ID` in `apps/server/src/utils/config.ts`)
-that doesn't exist as a real `auth.users` row. The migration's `user_id` columns
-are plain `uuid` with no foreign key for this reason — a real FK would reject
-every insert today. The RLS policies are already written against `auth.uid()`
-and are ready to go, but currently inert because the server queries with the
-`service_role` key (which bypasses RLS) rather than a real user session.
+Real Supabase Auth is now wired up (`apps/server/src/api/authMiddleware.ts` verifies
+the caller's session on every request; the frontend has real Login/Signup/Forgot-password
+screens). `supabase/migrations/0002_tighten_user_fk.sql` adds the FK back, using
+`NOT VALID` so any pre-existing rows (e.g. demo data inserted under the old fixed
+`DEMO_USER_ID` before auth existed) are grandfathered in rather than blocking the
+migration. New inserts are fully enforced. Run the migration if you haven't yet.
 
-Once Supabase Auth ships:
-```sql
-alter table monitored_urls add constraint monitored_urls_user_id_fkey
-  foreign key (user_id) references auth.users(id) on delete cascade;
-alter table runs add constraint runs_user_id_fkey
-  foreign key (user_id) references auth.users(id) on delete cascade;
-```
+The RLS policies from 0001 are still inert for the server's own requests — it
+uses the `service_role` key, which bypasses RLS — but ownership is enforced at
+the application layer instead (every route checks `monitor.userId === req.userId`
+before returning data; see `api/routes.ts`). RLS matters if anything ever queries
+Supabase directly with the anon key (e.g. a future client-side Realtime subscription).
+
+`DEMO_USER_ID` still exists as a fallback for when Supabase isn't configured at
+all (local dev against `MemoryStore`, no login required) — see README.
 
 ## Not yet re-exposed from Storage
 
