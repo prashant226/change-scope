@@ -101,6 +101,31 @@ export class SupabaseStore implements StorageAdapter {
     return (data || []).map(rowToMonitor);
   }
 
+  async deleteMonitor(id: string) {
+    // Storage objects live outside Postgres, so they aren't covered by the
+    // FK cascades below — clean them up first (best-effort: a stray file
+    // left behind is harmless clutter, not a correctness problem, so a
+    // failure here doesn't block deleting the actual records).
+    await Promise.all([
+      this.removeStorageFolder(SCREENSHOTS_BUCKET, id),
+      this.removeStorageFolder(RAW_HTML_BUCKET, id),
+    ]).catch((err) => console.error(`[storage] Failed to clean up storage for monitor ${id}:`, err));
+
+    // runs -> snapshots/changes/agent_logs all cascade from monitored_urls
+    // via ON DELETE CASCADE (see supabase/migrations/0001_init.sql) — one
+    // delete here is enough.
+    const { error } = await this.client.from("monitored_urls").delete().eq("id", id);
+    if (error) throw error;
+  }
+
+  private async removeStorageFolder(bucket: string, monitorId: string): Promise<void> {
+    const { data: files, error: listError } = await this.client.storage.from(bucket).list(monitorId);
+    if (listError || !files || files.length === 0) return;
+    const paths = files.map((f) => `${monitorId}/${f.name}`);
+    const { error: removeError } = await this.client.storage.from(bucket).remove(paths);
+    if (removeError) throw removeError;
+  }
+
   // ---- runs ----------------------------------------------------------------
 
   async createRun(input: Omit<RunRecord, "id" | "startedAt">) {

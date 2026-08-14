@@ -1,20 +1,29 @@
 import { useCallback, useEffect, useState } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
+import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import type { MonitorRecord, RunRecord, SnapshotSummary, AnalyzedChange } from "../types/api";
 import { api } from "../lib/api";
 import { useRun } from "../hooks/useRun";
 import { AgentTrail } from "../components/AgentTrail";
 import { ChangeCard } from "../components/ChangeCard";
 import { ReportSummary } from "../components/ReportSummary";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { groupByKey } from "../lib/groupChanges";
 import { SnapshotTimeline } from "../components/SnapshotTimeline";
 import { MonitorStatusBadge } from "../components/StatusBadge";
 import { relativeTime, formatDateTime, FREQUENCY_LABELS } from "../lib/format";
 import { downloadReportPdf } from "../lib/downloadPdf";
-import { ChevronDown, ChevronRight, Download } from "lucide-react";
+import { ChevronDown, ChevronRight, Download, Trash2 } from "lucide-react";
 
 type Tab = "changes" | "history" | "trail" | "settings";
 type Changes = { meaningful: AnalyzedChange[]; cosmetic: AnalyzedChange[] };
+
+function monitorHostname(url: string): string {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return url;
+  }
+}
 
 const FREQUENCIES = [
   { value: "hourly", label: "Every hour" },
@@ -25,8 +34,10 @@ const FREQUENCIES = [
 
 export function MonitorDetail() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const viewingRunId = searchParams.get("run");
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const [monitor, setMonitor] = useState<MonitorRecord | null>(null);
   const [snapshots, setSnapshots] = useState<SnapshotSummary[]>([]);
@@ -112,6 +123,12 @@ export function MonitorDetail() {
     } finally {
       setDownloadingPdf(false);
     }
+  }
+
+  async function handleDeleteMonitor() {
+    if (!id) return;
+    await api.deleteMonitor(id);
+    navigate("/monitors", { replace: true });
   }
 
   if (!monitor) return <div className="max-w-4xl mx-auto py-10 px-6 text-muted">Loading…</div>;
@@ -297,7 +314,33 @@ export function MonitorDetail() {
           >
             {monitor.status === "active" ? "Pause monitor" : "Resume monitor"}
           </button>
+
+          <div className="mt-8 pt-6 border-t border-border">
+            <h3 className="text-sm font-semibold text-high mb-1">Danger zone</h3>
+            <p className="text-xs text-muted mb-3">
+              Permanently deletes this monitor and its entire history — every snapshot, run, and change
+              report. This cannot be undone.
+            </p>
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-medium text-high transition-colors hover:bg-red-50"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              Delete monitor
+            </button>
+          </div>
         </section>
+      )}
+
+      {showDeleteConfirm && (
+        <ConfirmDialog
+          title="Delete this monitor?"
+          description={`This permanently deletes "${monitor.title || monitor.url}" and its entire history — every snapshot, run, and change report. This cannot be undone.`}
+          confirmLabel="Delete monitor"
+          requireTypedConfirmation={monitorHostname(monitor.url)}
+          onConfirm={handleDeleteMonitor}
+          onClose={() => setShowDeleteConfirm(false)}
+        />
       )}
     </div>
   );

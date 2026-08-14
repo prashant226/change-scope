@@ -77,6 +77,15 @@ router.patch("/monitors/:id", async (req, res) => {
   res.json({ monitor: updated });
 });
 
+// DELETE /api/monitors/:id — removes the monitor and everything tied to it
+// (runs, snapshots, changes, agent logs, stored screenshots/HTML). Irreversible.
+router.delete("/monitors/:id", async (req, res) => {
+  const monitor = await getOwnedMonitor(req.userId, req.params.id);
+  if (!monitor) return res.status(404).json({ error: "Monitor not found" });
+  await store.deleteMonitor(req.params.id);
+  res.status(204).send();
+});
+
 router.get("/monitors/:id/history", async (req, res) => {
   const monitor = await getOwnedMonitor(req.userId, req.params.id);
   if (!monitor) return res.status(404).json({ error: "Monitor not found" });

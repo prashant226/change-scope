@@ -49,6 +49,19 @@ export class MemoryStore implements StorageAdapter {
     );
   }
 
+  async deleteMonitor(id: string) {
+    const runIds = [...this.runs.values()].filter((r) => r.monitorId === id).map((r) => r.id);
+    for (const runId of runIds) {
+      this.runs.delete(runId);
+      this.logs.delete(runId);
+      this.changes.delete(runId);
+    }
+    for (const [snapshotId, snapshot] of this.snapshots) {
+      if (snapshot.monitorId === id) this.snapshots.delete(snapshotId);
+    }
+    this.monitors.delete(id);
+  }
+
   async createRun(input: Omit<RunRecord, "id" | "startedAt">) {
     const record: RunRecord = { ...input, id: randomUUID(), startedAt: new Date().toISOString() };
     this.runs.set(record.id, record);

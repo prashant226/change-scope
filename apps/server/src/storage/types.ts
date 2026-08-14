@@ -58,6 +58,8 @@ export interface StorageAdapter {
   updateMonitor(id: string, patch: Partial<MonitorRecord>): Promise<MonitorRecord>;
   /** Active monitors across all users whose next_run_at has arrived (or was never set) — used by the scheduler. */
   listDueMonitors(nowIso: string): Promise<MonitorRecord[]>;
+  /** Deletes a monitor and everything tied to it — runs, snapshots, changes, agent logs, and (Supabase) their stored screenshots/HTML. Irreversible. */
+  deleteMonitor(id: string): Promise<void>;
 
   createRun(input: Omit<RunRecord, "id" | "startedAt">): Promise<RunRecord>;
   updateRun(id: string, patch: Partial<RunRecord>): Promise<RunRecord>;

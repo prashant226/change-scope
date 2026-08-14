@@ -23,6 +23,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     const body = await res.json().catch(() => ({}));
     throw new Error(body.error || `Request failed (${res.status})`);
   }
+  if (res.status === 204) return undefined as T;
   return res.json();
 }
 
@@ -44,6 +45,7 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify(patch),
     }),
+  deleteMonitor: (monitorId: string) => request<void>(`/monitors/${monitorId}`, { method: "DELETE" }),
   getRun: (runId: string) => request<{ run: RunRecord }>(`/runs/${runId}`),
   getLogs: (runId: string) => request<{ logs: AgentLogEntry[] }>(`/runs/${runId}/logs`),
   getChanges: (runId: string) =>
