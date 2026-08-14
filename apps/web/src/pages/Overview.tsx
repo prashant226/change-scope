@@ -4,6 +4,7 @@ import { api } from "../lib/api";
 import { useRun } from "../hooks/useRun";
 import { AgentTrail } from "../components/AgentTrail";
 import { ChangeCard } from "../components/ChangeCard";
+import { groupByKey } from "../lib/groupChanges";
 import { ChevronDown, ChevronRight } from "lucide-react";
 
 export function Overview() {
@@ -121,8 +122,8 @@ export function Overview() {
       {changes && changes.meaningful.length > 0 && (
         <section className="space-y-4">
           <h2 className="text-sm font-semibold text-ink">Meaningful changes</h2>
-          {changes.meaningful.map((c) => (
-            <ChangeCard key={c.groupKey} change={c} />
+          {groupByKey(changes.meaningful).map((group) => (
+            <ChangeCard key={group[0].groupKey} changes={group} />
           ))}
         </section>
       )}

@@ -5,6 +5,7 @@ import { api } from "../lib/api";
 import { useRun } from "../hooks/useRun";
 import { AgentTrail } from "../components/AgentTrail";
 import { ChangeCard } from "../components/ChangeCard";
+import { groupByKey } from "../lib/groupChanges";
 import { SnapshotTimeline } from "../components/SnapshotTimeline";
 import { MonitorStatusBadge } from "../components/StatusBadge";
 import { relativeTime, formatDateTime, FREQUENCY_LABELS } from "../lib/format";
@@ -148,8 +149,8 @@ export function MonitorDetail() {
           )}
           {displayChanges && displayChanges.meaningful.length > 0 && (
             <div className="space-y-4 mb-6">
-              {displayChanges.meaningful.map((c) => (
-                <ChangeCard key={c.groupKey} change={c} />
+              {groupByKey(displayChanges.meaningful).map((group) => (
+                <ChangeCard key={group[0].groupKey} changes={group} />
               ))}
             </div>
           )}
