@@ -125,6 +125,7 @@ export async function capturePage(
   try {
     browser = await getBrowser();
   } catch (err) {
+    console.error("[capture] Failed to launch the browser engine:", err);
     return { ok: false, error: { code: "unknown", message: "Could not start the browser engine." } };
   }
 
