@@ -27,15 +27,32 @@ function formatDate(iso?: string): string {
   });
 }
 
+/**
+ * Two rows in the same group can carry an identical before/after pair (e.g.
+ * a hero image and a thumbnail both changing to the same new file) — that's
+ * one duplicate fact, not two pieces of evidence worth showing. Mirrors
+ * ChangeCard.tsx's dedupeRows on the web side so the PDF matches the report.
+ */
+export function dedupeRows(group: AnalyzedChange[]): AnalyzedChange[] {
+  const seen = new Set<string>();
+  return group.filter((c) => {
+    const key = `${c.beforeValue ?? ""}␟${c.afterValue ?? ""}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function renderGroup(group: AnalyzedChange[]): string {
   const first = group[0];
   const impact = IMPACT_STYLES[first.significance];
-  const rows = group
+  const dedupedRows = dedupeRows(group);
+  const rows = dedupedRows
     .map(
       (c) => `
       <div style="display:flex; gap:24px; margin-bottom:10px;">
         <div style="flex:1;">
-          ${group.length > 1 ? `<p style="font-size:11px;color:#64748B;margin:0 0 2px;">${esc(c.elementLabel)}</p>` : ""}
+          ${dedupedRows.length > 1 ? `<p style="font-size:11px;color:#64748B;margin:0 0 2px;">${esc(c.elementLabel)}</p>` : ""}
           <p style="font-size:10px;text-transform:uppercase;letter-spacing:0.04em;color:#64748B;margin:0 0 2px;">Before</p>
           <p style="font-size:13px;color:#111827;margin:0;">${esc(c.beforeValue) || "—"}</p>
         </div>

@@ -48,18 +48,40 @@ function slotSignature(el: SnapshotElement): string {
   return [el.tag, el.role || "", el.attributes?.href || ""].join("::");
 }
 
+/**
+ * A same-label identity signature independent of href — the visible text of
+ * a link/button ("Learn more") is usually a *stronger* identity signal than
+ * its destination, precisely because the destination is exactly the kind of
+ * attribute that legitimately changes (a "Learn more" link getting
+ * repointed at a more specific page) while the label stays put. Only
+ * meaningful (non-trivial) text counts, so this never fires for icon-only
+ * or near-empty elements where text isn't a reliable identity signal.
+ */
+function textSignature(el: SnapshotElement): string | null {
+  const text = el.text?.normalized;
+  if (!text || String(text).length < 3) return null;
+  return [el.tag, el.role || "", text].join("::");
+}
+
 export function matchElements(before: SnapshotElement[], after: SnapshotElement[]): ElementPair[] {
   const beforeRemaining = [...before];
   const afterRemaining = [...after];
   const pairs: ElementPair[] = [];
 
-  // Pass 1: match by href (strongest signal for links/buttons that carry identity).
+  // Pass 1: match by visible label first — see textSignature. This must run
+  // before the href pass so a link whose destination changed (but whose
+  // visible text didn't) is recognized as the same element with a changed
+  // attribute, not paired away by an unrelated href match or left stranded
+  // as a remove+add.
+  matchByPredicate(beforeRemaining, afterRemaining, pairs, (a) => textSignature(a));
+
+  // Pass 2: match remaining by href (identity signal for icon-only links/buttons with no usable text).
   matchByPredicate(beforeRemaining, afterRemaining, pairs, (a) => a.attributes?.href || null);
 
-  // Pass 2: match remaining by identical fingerprint (unchanged content).
+  // Pass 3: match remaining by identical fingerprint (unchanged content).
   matchByPredicate(beforeRemaining, afterRemaining, pairs, (a) => a.fingerprint);
 
-  // Pass 3: match remaining by slot signature + position order (same tag/role, aligned by order).
+  // Pass 4: match remaining by slot signature + position order (same tag/role, aligned by order).
   const bySlot = new Map<string, SnapshotElement[]>();
   for (const el of beforeRemaining) {
     const key = slotSignature(el);

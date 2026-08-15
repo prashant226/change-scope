@@ -7,6 +7,23 @@ const IMPACT_STYLES: Record<AnalyzedChange["significance"], { label: string; tex
 };
 
 /**
+ * Two rows in the same group can carry an identical before/after pair (e.g.
+ * a hero image and a thumbnail both pointing at the same file, both
+ * changing to the same new file) — that's a real duplicate *fact*, not two
+ * distinct pieces of evidence, so only the first survives for display.
+ * Detection/grouping is untouched; this only dedupes what gets rendered.
+ */
+function dedupeRows(changes: AnalyzedChange[]): AnalyzedChange[] {
+  const seen = new Set<string>();
+  return changes.filter((c) => {
+    const key = `${c.beforeValue ?? ""}␟${c.afterValue ?? ""}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+/**
  * Renders one grouped change event. `changes` may contain more than one raw
  * change sharing the same groupKey (e.g. a price + its discount changing
  * together) — those render as multiple before/after rows under one heading,
@@ -18,6 +35,7 @@ const IMPACT_STYLES: Record<AnalyzedChange["significance"], { label: string; tex
 export function ChangeCard({ changes }: { changes: AnalyzedChange[] }) {
   const first = changes[0];
   const impact = IMPACT_STYLES[first.significance];
+  const rows = dedupeRows(changes);
 
   return (
     <article className="card overflow-hidden">
@@ -41,9 +59,9 @@ export function ChangeCard({ changes }: { changes: AnalyzedChange[] }) {
         </div>
 
         <div className="space-y-3 mb-4">
-          {changes.map((c, i) => (
+          {rows.map((c, i) => (
             <div key={i}>
-              {changes.length > 1 && <p className="text-xs font-medium text-muted mb-1.5">{c.elementLabel}</p>}
+              {rows.length > 1 && <p className="text-xs font-medium text-muted mb-1.5">{c.elementLabel}</p>}
               <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-lg bg-soft border border-border px-3 py-2">
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-muted mb-0.5">Before</p>

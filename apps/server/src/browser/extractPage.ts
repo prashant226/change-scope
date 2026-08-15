@@ -72,11 +72,34 @@ export function extractPage(): RawExtractionResult {
     return text.trim();
   }
 
+  // Does this element have any descendant that CONTENT_TAGS would itself
+  // walk into and capture separately? Used below to decide whether a block
+  // text container is safe to read via full textContent — if something
+  // inside it will already be captured on its own, falling back here would
+  // duplicate that same text at two nesting levels.
+  function hasCapturableDescendant(el: Element): boolean {
+    for (const child of Array.from(el.children)) {
+      if (CONTENT_TAGS.has(child.tagName)) return true;
+      if (hasCapturableDescendant(child)) return true;
+    }
+    return false;
+  }
+
   function meaningfulText(el: Element): string {
     // Prefer direct text; fall back to full textContent for atomic elements (buttons/links/labels).
     const direct = directText(el);
     if (direct) return direct;
     if (["BUTTON", "A", "LABEL", "STRONG", "EM", "SMALL"].includes(el.tagName)) {
+      return (el.textContent || "").trim().slice(0, 300);
+    }
+    // A block-level text container (paragraph/quote/list item — the common
+    // shape for review/testimonial copy) whose text sits inside a wrapper
+    // tag that isn't independently captured (e.g. <i>, <q>, a plain <div>)
+    // would otherwise be silently skipped entirely, since directText() only
+    // sees the container's own text nodes. Fall back to the container's
+    // full text — but only when nothing inside it will be captured as its
+    // own element, or the same text would be reported twice.
+    if (["P", "BLOCKQUOTE", "Q", "LI"].includes(el.tagName) && !hasCapturableDescendant(el)) {
       return (el.textContent || "").trim().slice(0, 300);
     }
     return "";
