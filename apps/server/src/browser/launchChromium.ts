@@ -16,6 +16,7 @@
  * `playwright` package into the Vercel function — only the branch that
  * actually runs gets pulled in at runtime.
  */
+import path from "node:path";
 import type { Browser } from "playwright-core";
 
 export async function launchChromium(): Promise<Browser> {
@@ -26,7 +27,30 @@ export async function launchChromium(): Promise<Browser> {
       import(sparticuzModule),
       import(playwrightCoreModule),
     ]);
+
+    // Disables Chromium's GPU/graphics stack (headless doesn't need it) —
+    // recommended by @sparticuz/chromium for serverless targets. The API
+    // shape has changed across versions (property vs. setter method), so
+    // handle both rather than assuming one.
+    if (typeof (sparticuzChromium as any).setGraphicsMode === "function") {
+      (sparticuzChromium as any).setGraphicsMode(false);
+    } else {
+      sparticuzChromium.setGraphicsMode = false;
+    }
+
     const executablePath = await sparticuzChromium.executablePath();
+
+    // The extracted Chromium binary links against shared libraries
+    // (libnss3.so etc.) bundled alongside it in the same /tmp directory —
+    // but Vercel's runtime image doesn't have that directory on the
+    // dynamic linker's search path by default, so the binary fails to
+    // even start ("libnss3.so: cannot open shared object file") unless we
+    // point LD_LIBRARY_PATH at it ourselves before launching.
+    const execDir = path.dirname(executablePath);
+    process.env.LD_LIBRARY_PATH = process.env.LD_LIBRARY_PATH
+      ? `${execDir}:${process.env.LD_LIBRARY_PATH}`
+      : execDir;
+
     return chromium.launch({
       args: sparticuzChromium.args,
       executablePath,
