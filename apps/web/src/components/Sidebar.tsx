@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from "react-router-dom";
-import { Activity, BarChart3, History, LayoutGrid, ListChecks, LogOut, Radar, Settings } from "lucide-react";
+import { BarChart3, History, LayoutGrid, ListChecks, LogOut, Radar, Settings } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 
 const NAV_ITEMS = [
@@ -45,13 +45,6 @@ export function Sidebar() {
             {label}
           </NavLink>
         ))}
-
-        <div className="my-3 border-t border-border" />
-        <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted/70">Activity</p>
-        <div className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-muted">
-          <Activity className="h-4 w-4" strokeWidth={2} />
-          Agent runs
-        </div>
       </nav>
 
       <div className="px-3 pb-4 border-t border-border pt-3">
