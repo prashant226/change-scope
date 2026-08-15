@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { Check, Circle, Loader2 } from "lucide-react";
 import type { AgentLogEntry, RunRecord } from "../types/api";
 
 /**
@@ -133,10 +132,11 @@ function compactDetail(entry: AgentLogEntry): string[] {
   return lines;
 }
 
-function StatusIcon({ status, spinning }: { status: AgentLogEntry["status"]; spinning: boolean }) {
-  if (status === "failed") return <Circle className="h-4 w-4 text-high shrink-0" aria-hidden />;
-  if (spinning) return <Loader2 className="h-4 w-4 text-primary shrink-0 animate-spin" aria-hidden />;
-  return <Check className="h-4 w-4 text-low shrink-0" aria-hidden />;
+/** A colored status dot — the same visual language as the monitor/scan status badges elsewhere in the app, instead of mismatched checkmark glyphs. */
+function StatusDot({ status, spinning }: { status: AgentLogEntry["status"]; spinning: boolean }) {
+  const color = status === "failed" ? "bg-high" : spinning ? "bg-primary animate-pulse" : "bg-low";
+  // block, not the span default of inline — width/height are no-ops on inline elements.
+  return <span className={`block h-2 w-2 rounded-full shrink-0 ${color}`} aria-hidden />;
 }
 
 function useElapsed(startedAt: string | undefined, live: boolean): string {
@@ -167,7 +167,8 @@ function ActivityHeader({ run, logs, live }: { run?: RunRecord; logs: AgentLogEn
     const durationMs = run.completedAt ? new Date(run.completedAt).getTime() - new Date(run.startedAt).getTime() : undefined;
     return (
       <div className="flex items-center gap-2 flex-wrap">
-        <h2 className="text-sm font-semibold text-high">! Run failed</h2>
+        <span className="h-2 w-2 rounded-full bg-high shrink-0" aria-hidden />
+        <h2 className="text-sm font-semibold text-high">Run failed</h2>
         {durationMs !== undefined && <span className="text-xs text-muted">{formatDuration(durationMs)}</span>}
       </div>
     );
@@ -177,7 +178,8 @@ function ActivityHeader({ run, logs, live }: { run?: RunRecord; logs: AgentLogEn
   const showCounts = run?.reportType === "comparison";
   return (
     <div className="flex items-center gap-2 flex-wrap">
-      <h2 className="text-sm font-semibold text-ink">✓ Analysis complete</h2>
+      <span className="h-2 w-2 rounded-full bg-low shrink-0" aria-hidden />
+      <h2 className="text-sm font-semibold text-ink">Analysis complete</h2>
       {durationMs !== undefined && <span className="text-xs text-muted">{formatDuration(durationMs)}</span>}
       {showCounts && (
         <span className="text-xs text-muted">
@@ -205,8 +207,8 @@ export function AgentActivity({ logs, live, run }: { logs: AgentLogEntry[]; live
           const detail = compactDetail(entry);
           return (
             <div key={entry.sequence} className="flex gap-3">
-              <div className="pt-0.5">
-                <StatusIcon status={entry.status} spinning={isCurrentStep} />
+              <div className="pt-1.5">
+                <StatusDot status={entry.status} spinning={isCurrentStep} />
               </div>
               <div className="min-w-0">
                 <div className="flex items-baseline gap-2 flex-wrap">
