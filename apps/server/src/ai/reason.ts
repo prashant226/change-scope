@@ -35,7 +35,7 @@ STRICT RULES:
 2. Never invent a cause you cannot see in the evidence (no "because sales were declining", no "competitors may have..."). Only describe what the data shows and a plausible, hedged implication ("may indicate...", "could suggest...", "could affect...").
 3. Base your judgment only on the before/after values and classification given — do not assume information not provided.
 4. whatChanged and whyItMatters must each be exactly one sentence, written for a non-technical reader — no jargon, no raw numbers dump beyond what's needed.
-5. If a change is truly trivial or not worth a reader's attention even though it isn't CSS (e.g. a timestamp-like value that updates every load), set meaningful to false.
+5. Only set meaningful to false when a change is genuinely cosmetic, low-information, redundant, or semantically equivalent (see WORDING vs. SUBSTANCE below) — e.g. a timestamp-like value that updates every load. "meaningful: false" is not a catch-all for content you're merely uncertain how to interpret; if the underlying fact, promise, policy, capability, or positioning actually changed, it belongs in the main report as meaningful, even at low significance. When genuinely unsure, prefer meaningful: true with low significance and low confidence (the UI will show "Needs review") over silently excluding it.
 6. Set confidence honestly (0-1). Low confidence is fine — the product will show "Needs review" rather than you overstating certainty.
 7. Respond with the exact JSON schema provided. Every input group must have exactly one corresponding output entry, matched by groupKey.
 
@@ -43,7 +43,14 @@ CONTEXTUAL GUIDANCE (when present):
 Some groups include a "context" field with "guidance" and "constraints" from a demo-specific knowledge base for this monitored page. This is background context only, never a source of facts. Evidence priority, strictly in this order: (1) the current page's actual values, (2) the previous page's actual values, (3) other content visible on the page, (4) the snapshot's own structural context, (5) this contextual guidance, (6) general seasonal/business framing. If the guidance ever conflicts with what the page evidence actually shows, trust the page evidence and ignore the guidance. Obey every "constraints" entry for a group exactly — they are hard limits on what you're allowed to claim, not suggestions.
 
 WORDING vs. SUBSTANCE:
-If a change only reworded something without changing the underlying fact or offer (e.g. "Free delivery" → "Complimentary delivery"), treat it as not meaningful — semantically equivalent wording is not a real change.
+Judge copy/text changes by whether the communicated meaning, promise, policy, capability, or positioning changed — never by character count or how much text differs. A short edit can be highly meaningful; a long rewrite can be equivalent.
+- Not meaningful: pure synonym/rephrasing with the same underlying fact or offer (e.g. "Free delivery" → "Complimentary delivery").
+- Meaningful: a changed number or term inside otherwise-similar wording where the term changes what's promised (e.g. "Free returns within 30 days" → "Free returns within 7 days" — a policy change hiding in a small edit).
+- Meaningful: a longer rewrite that changes how capability or positioning is communicated, even if some words carry over (e.g. product copy that goes from mentioning "fast charging" to emphasizing "faster charging ... designed to keep up with demanding work" — the promise being communicated changed, even though much of the sentence is unchanged).
+When in doubt, ask: would a reader who only saw the "after" text form a different impression of the offer/capability/policy than one who only saw the "before" text? If yes, it's meaningful.
+
+DO NOT OVERCLAIM BEYOND THE PAGE:
+The webpage's wording is not proof of a physical-world fact — you are describing what the page now communicates, not verifying reality. If copy changes to emphasize a capability (e.g. "faster charging"), describe that the advertised/communicated messaging changed — never assert that the underlying hardware, service, or product itself was actually changed or upgraded unless the page explicitly states that. Correct: "The product messaging now emphasizes faster charging." Incorrect: "The device's charging hardware was upgraded."
 
 SEASONAL/PROMOTIONAL FRAMING:
 Only reference a seasonal or promotional period (e.g. a named sale or festive period) if the page's own text establishes it or it's given to you explicitly as context. Never invent a seasonal narrative the evidence doesn't support.`;

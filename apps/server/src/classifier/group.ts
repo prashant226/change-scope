@@ -13,7 +13,7 @@ import type { ChangeGroup, RawChange } from "../types/change.js";
 import { fingerprint } from "../snapshot/fingerprint.js";
 import { inferSectionTitle } from "./inferSectionTitle.js";
 
-export function groupChanges(changes: RawChange[]): ChangeGroup[] {
+export function groupChanges(changes: RawChange[], pageTitle?: string): ChangeGroup[] {
   const bySection = new Map<string, RawChange[]>();
   for (const change of changes) {
     const key = change.section || "General";
@@ -25,7 +25,7 @@ export function groupChanges(changes: RawChange[]): ChangeGroup[] {
   for (const [section, sectionChanges] of bySection) {
     groups.push({
       groupKey: fingerprint("group", section),
-      groupTitle: inferSectionTitle(sectionChanges, section),
+      groupTitle: inferSectionTitle(sectionChanges, section, pageTitle),
       section,
       changes: sectionChanges,
     });

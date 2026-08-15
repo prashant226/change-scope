@@ -10,6 +10,7 @@ import { buildSnapshot } from "../snapshot/build.js";
 import { diffSnapshots } from "../diff/engine.js";
 import { groupChanges } from "../classifier/group.js";
 import { partitionChanges } from "../classifier/partition.js";
+import { extractSemanticFacts } from "../classifier/semanticFacts.js";
 import { buildCosmeticChanges } from "../classifier/buildCosmeticChanges.js";
 import { reasonAboutChanges } from "../ai/reason.js";
 import { isShopkartPage, mergeShopkartRelatedGroups, retrieveShopkartContext } from "../ai/shopkartContext.js";
@@ -210,8 +211,16 @@ export async function executeRun(runId: string): Promise<void> {
     // real content change from the same section (§9-10).
     const { candidates, cosmetic } = partitionChanges(rawChanges);
 
+    // Semantic fact extraction (QA fix): decompose one element expressing two
+    // unrelated facts (e.g. "4.4 / 5 from 2,436 reviews"), then consolidate
+    // multiple elements that express the SAME fact (e.g. a review count
+    // repeated near the title and again in a ratings summary) into one
+    // logical change — before grouping, so the report never shows the same
+    // fact twice. Entirely generic (keyword/number based), not page-specific.
+    const semanticCandidates = extractSemanticFacts(candidates, snapshotData.metadata.title);
+
     await logger.log("grouping", "Grouping related changes", "Clustering low-level differences into higher-level events by section.", "in_progress");
-    let groups = groupChanges(candidates);
+    let groups = groupChanges(semanticCandidates, snapshotData.metadata.title);
     // ShopKart-only contextual grouping (spec Part B §33) — merges groups that
     // describe one related real-world event (e.g. availability + CTA) but
     // landed in different DOM sections. No-op for every other monitor.
@@ -220,6 +229,7 @@ export async function executeRun(runId: string): Promise<void> {
     await logger.log("grouping", "Grouping complete", `Formed ${groups.length} change group(s), plus ${cosmetic.length} cosmetic change(s) set aside.`, "completed", {
       candidateGroups: groups.length,
       cosmeticExcluded: cosmetic.length,
+      duplicateFactsConsolidated: candidates.length - semanticCandidates.length,
     });
 
     if (groups.length === 0) {
