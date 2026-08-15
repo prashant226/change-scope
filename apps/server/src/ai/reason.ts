@@ -11,6 +11,7 @@ import OpenAI from "openai";
 import type { ChangeGroup, AnalyzedChange } from "../types/change.js";
 import { buildAiContext } from "./buildContext.js";
 import { aiResponseSchema, aiJsonSchema } from "./schema.js";
+import type { ShopkartContextForGroup } from "./shopkartContext.js";
 
 const MODEL = "gpt-5-mini";
 
@@ -36,7 +37,16 @@ STRICT RULES:
 4. whatChanged and whyItMatters must each be exactly one sentence, written for a non-technical reader — no jargon, no raw numbers dump beyond what's needed.
 5. If a change is truly trivial or not worth a reader's attention even though it isn't CSS (e.g. a timestamp-like value that updates every load), set meaningful to false.
 6. Set confidence honestly (0-1). Low confidence is fine — the product will show "Needs review" rather than you overstating certainty.
-7. Respond with the exact JSON schema provided. Every input group must have exactly one corresponding output entry, matched by groupKey.`;
+7. Respond with the exact JSON schema provided. Every input group must have exactly one corresponding output entry, matched by groupKey.
+
+CONTEXTUAL GUIDANCE (when present):
+Some groups include a "context" field with "guidance" and "constraints" from a demo-specific knowledge base for this monitored page. This is background context only, never a source of facts. Evidence priority, strictly in this order: (1) the current page's actual values, (2) the previous page's actual values, (3) other content visible on the page, (4) the snapshot's own structural context, (5) this contextual guidance, (6) general seasonal/business framing. If the guidance ever conflicts with what the page evidence actually shows, trust the page evidence and ignore the guidance. Obey every "constraints" entry for a group exactly — they are hard limits on what you're allowed to claim, not suggestions.
+
+WORDING vs. SUBSTANCE:
+If a change only reworded something without changing the underlying fact or offer (e.g. "Free delivery" → "Complimentary delivery"), treat it as not meaningful — semantically equivalent wording is not a real change.
+
+SEASONAL/PROMOTIONAL FRAMING:
+Only reference a seasonal or promotional period (e.g. a named sale or festive period) if the page's own text establishes it or it's given to you explicitly as context. Never invent a seasonal narrative the evidence doesn't support.`;
 
 /** Below this confidence, the UI shows "Needs review" rather than presenting the interpretation as settled. */
 const NEEDS_REVIEW_THRESHOLD = 0.5;
@@ -87,6 +97,7 @@ export async function reasonAboutChanges(
   groups: ChangeGroup[],
   pageTitle: string,
   options: { apiKey?: string; tokenBudget: number; retryCount: number; retryDelayMs: number },
+  shopkartContext?: Map<string, ShopkartContextForGroup>,
 ): Promise<ReasonResult> {
   if (groups.length === 0) {
     return { ok: true, changes: [], aiUnavailable: false, metrics: { model: MODEL, groupsSubmitted: 0 } };
@@ -96,7 +107,7 @@ export async function reasonAboutChanges(
   }
 
   const client = new OpenAI({ apiKey: options.apiKey });
-  const context = buildAiContext(groups, pageTitle, options.tokenBudget);
+  const context = buildAiContext(groups, pageTitle, options.tokenBudget, shopkartContext);
   // Rough 4-chars-per-token heuristic, same one buildAiContext uses for its budget check —
   // a real measured estimate of what was actually sent, not a guess pulled from nowhere.
   const contextTokensApprox = Math.round(JSON.stringify(context).length / 4);

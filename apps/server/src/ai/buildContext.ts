@@ -4,6 +4,7 @@
  * values, and their section context.
  */
 import type { ChangeGroup } from "../types/change.js";
+import type { ShopkartContextForGroup } from "./shopkartContext.js";
 
 export interface AiContextItem {
   groupKey: string;
@@ -16,6 +17,8 @@ export interface AiContextItem {
     before?: string;
     after?: string;
   }>;
+  /** Only present for groups the ShopKart KB deterministically matched — see shopkartContext.ts. Never sent for any other monitor. */
+  context?: ShopkartContextForGroup;
 }
 
 const MAX_VALUE_CHARS = 200;
@@ -34,6 +37,7 @@ export function buildAiContext(
   groups: ChangeGroup[],
   pageTitle: string,
   tokenBudget: number,
+  shopkartContext?: Map<string, ShopkartContextForGroup>,
 ): AiContextItem[] {
   const items: AiContextItem[] = groups.map((g) => ({
     groupKey: g.groupKey,
@@ -46,6 +50,7 @@ export function buildAiContext(
       before: truncate(c.beforeValue),
       after: truncate(c.afterValue),
     })),
+    context: shopkartContext?.get(g.groupKey),
   }));
 
   const charBudget = tokenBudget * 4;
