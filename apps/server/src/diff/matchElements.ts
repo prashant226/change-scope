@@ -17,7 +17,13 @@ export interface ElementPair {
   after?: SnapshotElement;
 }
 
-function sectionKey(s: SnapshotSection): string {
+/**
+ * Stable section identity — a real heading, never DOM index/position alone.
+ * Exported so other structural analyses (e.g. diff/sectionOrder.ts) key
+ * sections the exact same way matchSections does, instead of re-deriving
+ * their own notion of "same section" and risking it drifting out of sync.
+ */
+export function sectionKey(s: SnapshotSection): string {
   return (s.heading || `section-${s.position}`).trim().toLowerCase();
 }
 

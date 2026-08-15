@@ -7,6 +7,8 @@ import type { PageSnapshot } from "../types/snapshot.js";
 import type { RawChange } from "../types/change.js";
 import { matchSections, matchElements } from "./matchElements.js";
 import { classifyPair } from "../classifier/classify.js";
+import { collapseSectionStructuralEvent } from "./structuralCollapse.js";
+import { detectSectionReorder } from "./sectionOrder.js";
 import { fingerprint } from "../snapshot/fingerprint.js";
 
 export function diffSnapshots(before: PageSnapshot, after: PageSnapshot): RawChange[] {
@@ -41,11 +43,19 @@ export function diffSnapshots(before: PageSnapshot, after: PageSnapshot): RawCha
     if (!pair.before || !pair.after) continue;
 
     const elementPairs = matchElements(pair.before.elements, pair.after.elements);
+    const sectionChanges: RawChange[] = [];
     for (const ep of elementPairs) {
       const change = classifyPair(ep, sectionLabel);
-      if (change) changes.push(change);
+      if (change) sectionChanges.push(change);
     }
+    // A section whose heading survived but whose children were wholesale
+    // removed or replaced is a section-level structural event, not N
+    // independent element removals — see structuralCollapse.ts.
+    changes.push(...collapseSectionStructuralEvent(sectionChanges, sectionLabel, pair.after.elements.length));
   }
+
+  const reorder = detectSectionReorder(before.sections, after.sections);
+  if (reorder) changes.push(reorder);
 
   return changes;
 }

@@ -53,7 +53,10 @@ DO NOT OVERCLAIM BEYOND THE PAGE:
 The webpage's wording is not proof of a physical-world fact — you are describing what the page now communicates, not verifying reality. If copy changes to emphasize a capability (e.g. "faster charging"), describe that the advertised/communicated messaging changed — never assert that the underlying hardware, service, or product itself was actually changed or upgraded unless the page explicitly states that. Correct: "The product messaging now emphasizes faster charging." Incorrect: "The device's charging hardware was upgraded."
 
 SEASONAL/PROMOTIONAL FRAMING:
-Only reference a seasonal or promotional period (e.g. a named sale or festive period) if the page's own text establishes it or it's given to you explicitly as context. Never invent a seasonal narrative the evidence doesn't support.`;
+Only reference a seasonal or promotional period (e.g. a named sale or festive period) if the page's own text establishes it or it's given to you explicitly as context. Never invent a seasonal narrative the evidence doesn't support.
+
+STRUCTURAL EVENTS:
+Some groups are structural page events rather than a value changing — a whole section being removed, replaced, or reordered (elementLabel "Section" or "Section order", classification structural). These are already deterministically detected as ONE logical event by the diff engine — never re-split them or treat their before/after lists (e.g. the names of removed items, or a "Before → Now" section-order sequence) as separate changes. Judge significance on its own merits, not by a fixed rule: a removed recommendations/cross-sell section is usually lower-stakes than a removed pricing or availability section; a section reorder is usually low-to-medium impact unless it plausibly affects a core purchase decision. Never default a reorder to high impact just because something moved.`;
 
 /** Below this confidence, the UI shows "Needs review" rather than presenting the interpretation as settled. */
 const NEEDS_REVIEW_THRESHOLD = 0.5;
