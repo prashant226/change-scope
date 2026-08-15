@@ -6,7 +6,8 @@
  * This is an *observation* agent — it never submits forms, logs in, or clicks
  * anything beyond dismissing an obvious cookie/consent overlay.
  */
-import { chromium, type Browser } from "playwright";
+import type { Browser } from "playwright-core";
+import { launchChromium } from "./launchChromium.js";
 import { assertHostIsPublic, validateUrlSyntax } from "./urlSafety.js";
 import { extractPage } from "./extractPage.js";
 import type { RawExtractionResult } from "./extractPage.js";
@@ -46,7 +47,7 @@ let sharedBrowser: Browser | null = null;
 
 async function getBrowser(): Promise<Browser> {
   if (!sharedBrowser || !sharedBrowser.isConnected()) {
-    sharedBrowser = await chromium.launch({ headless: true });
+    sharedBrowser = await launchChromium();
   }
   return sharedBrowser;
 }

@@ -5,10 +5,10 @@
  * infrequent, on-demand user action, not worth coupling to capture
  * concurrency.
  */
-import { chromium } from "playwright";
+import { launchChromium } from "../browser/launchChromium.js";
 
 export async function renderHtmlToPdf(html: string): Promise<Buffer> {
-  const browser = await chromium.launch({ headless: true });
+  const browser = await launchChromium();
   try {
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: "networkidle" });

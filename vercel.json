@@ -1,0 +1,18 @@
+{
+  "buildCommand": "npm run build:web",
+  "outputDirectory": "apps/web/dist",
+  "installCommand": "npm install",
+  "functions": {
+    "api/index.ts": {
+      "maxDuration": 60
+    }
+  },
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api" },
+    { "source": "/health", "destination": "/api" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ],
+  "crons": [
+    { "path": "/api/cron/tick", "schedule": "0 3 * * *" }
+  ]
+}

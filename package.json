@@ -2,6 +2,7 @@
   "name": "changescope",
   "private": true,
   "version": "0.1.0",
+  "type": "module",
   "description": "ChangeScope — AI Web Change Intelligence Agent",
   "workspaces": [
     "apps/web",

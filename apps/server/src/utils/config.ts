@@ -22,6 +22,8 @@ export const config = {
   aiRetryDelayMs: num("AI_RETRY_DELAY_MS", 1000),
   /** Dev-only: logs every raw diff change (entity/type/subtype/before/after/parent/suppressedBy) to the server console. Never surfaced in the UI or API — see diff/debugDiff.ts. */
   debugDiff: process.env.DEBUG_DIFF === "1",
+  /** Shared secret checked against POST /api/cron/tick's Authorization header on deployments where Vercel's own `x-vercel-cron` header isn't present (e.g. a manual/local test hit) — see app.ts and scheduler/index.ts. */
+  cronSecret: process.env.CRON_SECRET,
 };
 
 /**

@@ -13,3 +13,6 @@ apps/web/dist/
 apps/server/dist/
 .claude/
 *.tsbuildinfo
+
+.vercel
+.env*
