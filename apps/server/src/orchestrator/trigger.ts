@@ -40,9 +40,21 @@ export async function triggerRun(
 
   markRunStarted(userId, monitorId);
   // Fire-and-forget: callers get the run id back immediately (§70).
-  executeRun(run.id)
+  const runPromise = executeRun(run.id)
     .catch((err) => console.error("[trigger] executeRun crashed:", err))
     .finally(() => markRunFinished(userId));
+
+  // On a long-running host this detached promise just keeps executing in
+  // the background. A Vercel serverless function has no persistent process
+  // backing it, though — without this, the platform can freeze/terminate
+  // the function once the HTTP response is sent, killing the run mid-flight
+  // (observed live: runs got stuck at "running" forever). waitUntil() tells
+  // Vercel to keep the invocation alive until the promise settles, up to
+  // vercel.json's maxDuration. No-op (and unimported) everywhere else.
+  if (process.env.VERCEL) {
+    const { waitUntil } = await import("@vercel/functions");
+    waitUntil(runPromise);
+  }
 
   return { run };
 }
