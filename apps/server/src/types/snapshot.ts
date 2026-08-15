@@ -60,6 +60,8 @@ export interface SnapshotElement {
 export interface SnapshotSection {
   id: string;
   heading?: string;
+  /** 1-6 for an H1-H6-derived heading, undefined for a landmark-derived fallback. Used to reconstruct which sections are logically nested under which (see diff/structuralHierarchy.ts) — sections are stored as a flat list, this is what lets ancestor-aware suppression work without a DOM tree. */
+  headingLevel?: number;
   position: number;
   elements: SnapshotElement[];
 }

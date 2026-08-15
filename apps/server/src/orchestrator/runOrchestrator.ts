@@ -8,6 +8,7 @@ import { createHash } from "node:crypto";
 import { capturePage } from "../browser/capture.js";
 import { buildSnapshot } from "../snapshot/build.js";
 import { diffSnapshots } from "../diff/engine.js";
+import { logDiffDebug } from "../diff/debugDiff.js";
 import { groupChanges } from "../classifier/group.js";
 import { partitionChanges } from "../classifier/partition.js";
 import { extractSemanticFacts } from "../classifier/semanticFacts.js";
@@ -190,6 +191,7 @@ export async function executeRun(runId: string): Promise<void> {
 
     await logger.log("comparing", "Comparing snapshots", "Detecting differences between current and previous page state.", "in_progress");
     const rawChanges = diffSnapshots(previousSnapshot.snapshot, snapshotData);
+    if (config.debugDiff) logDiffDebug(rawChanges);
     await logger.log("comparing", "Comparison complete", `Found ${rawChanges.length} raw difference(s).`, "completed", {
       rawDifferences: rawChanges.length,
     });

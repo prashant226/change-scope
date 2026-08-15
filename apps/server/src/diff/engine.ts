@@ -10,6 +10,7 @@ import { classifyPair } from "../classifier/classify.js";
 import { collapseSectionStructuralEvent } from "./structuralCollapse.js";
 import { detectSectionReorder } from "./sectionOrder.js";
 import { resolveSemanticContinuity, buildContinuityEvent } from "./semanticContinuity.js";
+import { suppressDerivedSectionEvents } from "./structuralHierarchy.js";
 import { fingerprint } from "../snapshot/fingerprint.js";
 
 export function diffSnapshots(before: PageSnapshot, after: PageSnapshot): RawChange[] {
@@ -60,8 +61,7 @@ export function diffSnapshots(before: PageSnapshot, after: PageSnapshot): RawCha
     const elementPairs = matchElements(pair.before.elements, pair.after.elements);
     const sectionChanges: RawChange[] = [];
     for (const ep of elementPairs) {
-      const change = classifyPair(ep, sectionLabel);
-      if (change) sectionChanges.push(change);
+      sectionChanges.push(...classifyPair(ep, sectionLabel));
     }
     // A section whose heading survived but whose children were wholesale
     // removed or replaced is a section-level structural event, not N
@@ -80,8 +80,7 @@ export function diffSnapshots(before: PageSnapshot, after: PageSnapshot): RawCha
     const elementPairs = matchElements(match.before.elements, match.after.elements);
     const sectionChanges: RawChange[] = [];
     for (const ep of elementPairs) {
-      const change = classifyPair(ep, sectionLabel);
-      if (change) sectionChanges.push(change);
+      sectionChanges.push(...classifyPair(ep, sectionLabel));
     }
     changes.push(...collapseSectionStructuralEvent(sectionChanges, sectionLabel, match.after.elements.length));
   }
@@ -89,5 +88,10 @@ export function diffSnapshots(before: PageSnapshot, after: PageSnapshot): RawCha
   const reorder = detectSectionReorder(before.sections, after.sections);
   if (reorder) changes.push(reorder);
 
-  return changes;
+  // Structural Hierarchy Analysis: a section removed/added alongside an
+  // ancestor of it being removed/added in the same comparison is a
+  // consequence of that ancestor event, not an independent one — see
+  // structuralHierarchy.ts. Runs last, over the full change set, since it
+  // only ever touches section-level added/removed events.
+  return suppressDerivedSectionEvents(changes, before, after);
 }

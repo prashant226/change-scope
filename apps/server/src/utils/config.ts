@@ -20,6 +20,8 @@ export const config = {
   maxScrollSteps: num("MAX_SCROLL_STEPS", 25),
   aiRetryCount: num("AI_RETRY_COUNT", 1),
   aiRetryDelayMs: num("AI_RETRY_DELAY_MS", 1000),
+  /** Dev-only: logs every raw diff change (entity/type/subtype/before/after/parent/suppressedBy) to the server console. Never surfaced in the UI or API — see diff/debugDiff.ts. */
+  debugDiff: process.env.DEBUG_DIFF === "1",
 };
 
 /**

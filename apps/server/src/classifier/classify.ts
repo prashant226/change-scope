@@ -2,6 +2,12 @@
  * Deterministic classification of a matched element pair into a change type +
  * category (§48-49). No AI here — only obvious, rule-based judgments. AI later
  * only refines "meaningful vs noise" and significance, never the raw facts.
+ *
+ * Returns an ARRAY, not a single change: the same element can carry more
+ * than one independent kind of change at once (a button whose label AND
+ * color both changed) and each must surface as its own logical event —
+ * functional and visual_css never overwrite each other (root-cause fix,
+ * QA §19 "same element multiple change types").
  */
 import type { ElementPair } from "../diff/matchElements.js";
 import type { Classification, RawChange, ChangeType } from "../types/change.js";
@@ -16,37 +22,38 @@ function elementLabel(pair: ElementPair): string {
   return el.text?.normalized?.slice(0, 60) || el.attributes?.ariaLabel || el.attributes?.alt || el.tag;
 }
 
-export function classifyPair(pair: ElementPair, section: string | undefined): RawChange | null {
+export function classifyPair(pair: ElementPair, section: string | undefined): RawChange[] {
   const { before, after } = pair;
   const id = fingerprint(section, elementLabel(pair), before?.id, after?.id);
 
   if (!before && after) {
     const classification: Classification = after.tag === "img" ? "media" : INTERACTIVE_TAGS.has(after.tag) ? "functional" : "content";
-    return {
+    return [{
       id, changeType: "added", classification, section,
       elementLabel: elementLabel(pair), afterValue: after.text?.raw ?? after.attributes?.src,
-    };
+    }];
   }
 
   if (before && !after) {
     const classification: Classification = before.tag === "img" ? "media" : INTERACTIVE_TAGS.has(before.tag) ? "functional" : "content";
-    return {
+    return [{
       id, changeType: "removed", classification, section,
       elementLabel: elementLabel(pair), beforeValue: before.text?.raw ?? before.attributes?.src,
-    };
+    }];
   }
 
-  if (!before || !after) return null;
+  if (!before || !after) return [];
 
-  // Media: image src changed.
+  // Media: image src changed. Exclusive of everything else below — an <img>
+  // doesn't carry the text/functional signals the rest of this function checks.
   if (before.tag === "img" || after.tag === "img") {
     if (before.attributes?.src !== after.attributes?.src) {
-      return {
+      return [{
         id, changeType: "modified", classification: "media", section,
         elementLabel: elementLabel(pair), beforeValue: before.attributes?.src, afterValue: after.attributes?.src,
-      };
+      }];
     }
-    return null;
+    return [];
   }
 
   const textChanged = (before.text?.normalized || "") !== (after.text?.normalized || "");
@@ -56,36 +63,44 @@ export function classifyPair(pair: ElementPair, section: string | undefined): Ra
   const visualChanged = VISUAL_KEYS.some((k) => before.visual?.[k] !== after.visual?.[k]);
 
   if (!textChanged && !hrefChanged && !enabledChanged && !visibleChanged && !visualChanged) {
-    return null; // unchanged — not reported
+    return []; // unchanged — not reported
   }
 
-  if (hrefChanged || enabledChanged || visibleChanged || (INTERACTIVE_TAGS.has(after.tag) && textChanged)) {
-    return {
-      id, changeType: "modified", classification: "functional", section,
+  const results: RawChange[] = [];
+
+  const isFunctional = hrefChanged || enabledChanged || visibleChanged || (INTERACTIVE_TAGS.has(after.tag) && textChanged);
+  if (isFunctional) {
+    results.push({
+      id: fingerprint(id, "functional"), changeType: "modified", classification: "functional", section,
       elementLabel: elementLabel(pair),
       beforeValue: before.text?.raw, afterValue: after.text?.raw,
       evidence: { hrefChanged, enabledChanged, visibleChanged },
-    };
-  }
-
-  if (textChanged) {
-    return {
-      id, changeType: "modified", classification: "content", section,
+    });
+  } else if (textChanged) {
+    // Only reachable for a non-interactive element (a functional element's
+    // text change is already captured as the functional event above — a
+    // button's label change IS its functional change, not a separate
+    // content one).
+    results.push({
+      id: fingerprint(id, "content"), changeType: "modified", classification: "content", section,
       elementLabel: elementLabel(pair),
       beforeValue: before.text?.raw, afterValue: after.text?.raw,
       evidence: { beforeNormalizedValue: before.value?.normalized, afterNormalizedValue: after.value?.normalized },
-    };
+    });
   }
 
+  // Independent of whichever branch above fired — a visual/CSS change on
+  // this same element is its own event, never hidden by a functional or
+  // content change happening at the same time.
   if (visualChanged) {
-    return {
-      id, changeType: "modified", classification: "visual", section,
+    results.push({
+      id: fingerprint(id, "visual"), changeType: "modified", classification: "visual", section,
       elementLabel: elementLabel(pair),
       beforeValue: describeVisual(before.visual), afterValue: describeVisual(after.visual),
-    };
+    });
   }
 
-  return null;
+  return results;
 }
 
 function describeVisual(visual?: { color?: string; backgroundColor?: string; fontSize?: string; fontWeight?: string }): string {

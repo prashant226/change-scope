@@ -58,6 +58,7 @@ export function buildSnapshot(url: string, capture: CaptureResult): PageSnapshot
     return {
       id: sectionId,
       heading: s.heading || undefined,
+      headingLevel: s.headingLevel ?? undefined,
       position: sectionIndex,
       elements: s.elements.map((el, i) => buildElement(el, sectionId, i)),
     };

@@ -13,11 +13,11 @@ describe("matchElements — link destination change (QA fix)", () => {
     expect(pairs[0].before).toBeDefined();
     expect(pairs[0].after).toBeDefined();
 
-    const change = classifyPair(pairs[0], "Price Protection");
-    expect(change).not.toBeNull();
-    expect(change!.changeType).toBe("modified");
-    expect(change!.classification).toBe("functional");
-    expect(change!.evidence?.hrefChanged).toBe(true);
+    const changes = classifyPair(pairs[0], "Price Protection");
+    expect(changes).toHaveLength(1);
+    expect(changes[0].changeType).toBe("modified");
+    expect(changes[0].classification).toBe("functional");
+    expect(changes[0].evidence?.hrefChanged).toBe(true);
   });
 
   it("still matches by href when a link's visible text is missing/too short (icon-only link)", () => {
@@ -34,8 +34,8 @@ describe("matchElements — link destination change (QA fix)", () => {
     const after = [el({ tag: "a", text: "Home", attributes: { href: "/" } })];
     const pairs = matchElements(before, after);
     expect(pairs).toHaveLength(1);
-    const change = classifyPair(pairs[0], "Nav");
-    expect(change).toBeNull(); // truly unchanged — not reported
+    const changes = classifyPair(pairs[0], "Nav");
+    expect(changes).toHaveLength(0); // truly unchanged — not reported
   });
 
   it("does not regress duplicate-href matching (multiple elements sharing href='#')", () => {

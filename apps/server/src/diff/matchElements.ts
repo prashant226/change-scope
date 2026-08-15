@@ -1,8 +1,11 @@
 /**
- * Stable element matching across two snapshots (§47). Uses multiple signals —
- * section identity, tag/role, href, and position — rather than raw DOM index,
- * so "price element changed value" is recognized as one modified element
- * instead of a remove+add pair.
+ * Stable element matching across two snapshots (§47) — this is
+ * `matchLogicalEntity()` for elements (matchSections is its section-level
+ * counterpart): four signals, checked in priority order, never raw DOM
+ * index. The last of these (slot signature + local sibling index) is the
+ * generic mechanism repeated-card content relies on for stable identity —
+ * "the 2nd review card" rather than "review #47 in the whole document" —
+ * see matchElements()'s Pass 4 below.
  */
 import type { SnapshotElement, SnapshotSection } from "../types/snapshot.js";
 
@@ -43,7 +46,15 @@ export function matchSections(before: SnapshotSection[], after: SnapshotSection[
   });
 }
 
-/** A same-slot identity signature independent of the element's current text/value. */
+/**
+ * A same-slot identity signature independent of the element's current
+ * text/value — tag + role + href only. Elements sharing this signature
+ * within one section (e.g. every review body: `p::::`) are paired up in
+ * local document order (see the "local sibling index" pass below), which
+ * is exactly the stable-identity mechanism repeated content — review
+ * cards, product cards, list items — needs: "the Nth item of this shape
+ * in this section," never a raw global DOM index.
+ */
 function slotSignature(el: SnapshotElement): string {
   return [el.tag, el.role || "", el.attributes?.href || ""].join("::");
 }
@@ -81,7 +92,11 @@ export function matchElements(before: SnapshotElement[], after: SnapshotElement[
   // Pass 3: match remaining by identical fingerprint (unchanged content).
   matchByPredicate(beforeRemaining, afterRemaining, pairs, (a) => a.fingerprint);
 
-  // Pass 4: match remaining by slot signature + position order (same tag/role, aligned by order).
+  // Pass 4: local sibling index — match remaining elements by slot signature
+  // (same tag/role/href "shape"), paired in document order within that
+  // shape. This is what lets "review card #2's text changed" survive as one
+  // modified entity instead of a remove+add, without ever hard-coding what
+  // a "review" is — it works for any repeated content shape generically.
   const bySlot = new Map<string, SnapshotElement[]>();
   for (const el of beforeRemaining) {
     const key = slotSignature(el);

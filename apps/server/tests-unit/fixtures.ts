@@ -23,8 +23,8 @@ export function el(overrides: Partial<Omit<SnapshotElement, "text">> & { text?: 
   };
 }
 
-export function section(heading: string | undefined, position: number, elements: SnapshotElement[]): SnapshotSection {
-  return { id: fingerprint("section", position, heading), heading, position, elements };
+export function section(heading: string | undefined, position: number, elements: SnapshotElement[], headingLevel?: number): SnapshotSection {
+  return { id: fingerprint("section", position, heading), heading, headingLevel, position, elements };
 }
 
 export function snapshot(sections: SnapshotSection[]): PageSnapshot {

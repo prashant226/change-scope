@@ -27,6 +27,8 @@ export interface RawExtractedElement {
 
 export interface RawExtractedSection {
   heading: string | null;
+  /** 1-6 for an H1-H6 heading, null for a landmark-derived fallback section (nav/header/footer/etc). */
+  headingLevel: number | null;
   position: number;
   elements: RawExtractedElement[];
 }
@@ -108,7 +110,7 @@ export function extractPage(): RawExtractionResult {
   const allEls = Array.from(document.body.querySelectorAll<HTMLElement>("*"));
 
   const sections: RawExtractedSection[] = [];
-  let current: RawExtractedSection = { heading: null, position: 0, elements: [] };
+  let current: RawExtractedSection = { heading: null, headingLevel: null, position: 0, elements: [] };
   sections.push(current);
 
   // Many client-rendered nav/footer regions have no <h1-3> heading at all, so
@@ -135,7 +137,7 @@ export function extractPage(): RawExtractionResult {
       if (landmarkKey) {
         const [tag, label] = landmarkKey.split(":");
         const niceLabel = label || tag.charAt(0) + tag.slice(1).toLowerCase();
-        current = { heading: niceLabel, position: sections.length, elements: [] };
+        current = { heading: niceLabel, headingLevel: null, position: sections.length, elements: [] };
         sections.push(current);
       }
     }
@@ -143,7 +145,8 @@ export function extractPage(): RawExtractionResult {
     if (SECTION_HEADING_TAGS.has(el.tagName)) {
       const headingText = (el.textContent || "").trim().slice(0, 200);
       if (headingText) {
-        current = { heading: headingText, position: sections.length, elements: [] };
+        const level = Number(el.tagName.slice(1)); // "H1".."H6" -> 1..6
+        current = { heading: headingText, headingLevel: level, position: sections.length, elements: [] };
         sections.push(current);
         continue; // heading itself becomes the section title, not a content element
       }
