@@ -6,6 +6,7 @@
 import { getStore } from "../storage/index.js";
 import { canStartRun, markRunStarted, markRunFinished } from "../api/rateLimit.js";
 import { executeRun } from "./runOrchestrator.js";
+import { reconcileStaleRun } from "./reconcileStaleRun.js";
 import type { RunRecord } from "../storage/types.js";
 
 const store = getStore();
@@ -19,7 +20,7 @@ export async function triggerRun(
   // covers every combination (manual-vs-manual, scheduled-vs-scheduled,
   // manual-vs-scheduled) without each caller needing its own check (§29).
   const recentRuns = await store.listRunsForMonitor(monitorId);
-  const latest = recentRuns[0];
+  const latest = recentRuns[0] ? await reconcileStaleRun(recentRuns[0]) : undefined;
   if (latest && (latest.status === "queued" || latest.status === "running")) {
     return { error: "A scan is already running for this monitor." };
   }

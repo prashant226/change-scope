@@ -3,6 +3,7 @@ import { getStore } from "../storage/index.js";
 import { validateUrlSyntax } from "../browser/urlSafety.js";
 import { normalizeUrl } from "../utils/normalizeUrl.js";
 import { triggerRun } from "../orchestrator/trigger.js";
+import { reconcileStaleRun } from "../orchestrator/reconcileStaleRun.js";
 import { buildAnalytics } from "../reports/analytics.js";
 import { buildMonitorSummaries, buildMonitorSummary } from "../reports/monitorSummary.js";
 import { computeNextRunAt } from "../utils/schedule.js";
@@ -193,8 +194,9 @@ router.post("/runs", async (req, res) => {
 });
 
 router.get("/runs/:id", async (req, res) => {
-  const run = await store.getRun(req.params.id);
+  let run = await store.getRun(req.params.id);
   if (!run || run.userId !== req.userId) return res.status(404).json({ error: "Run not found" });
+  run = await reconcileStaleRun(run);
   res.json({ run });
 });
 

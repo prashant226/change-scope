@@ -24,6 +24,18 @@ export const config = {
   debugDiff: process.env.DEBUG_DIFF === "1",
   /** Shared secret checked against POST /api/cron/tick's Authorization header on deployments where Vercel's own `x-vercel-cron` header isn't present (e.g. a manual/local test hit) — see app.ts and scheduler/index.ts. */
   cronSecret: process.env.CRON_SECRET,
+  /**
+   * A run still "queued"/"running" after this long is treated as stale and
+   * gets force-marked "failed" the next time it's touched (see
+   * orchestrator/reconcileStaleRun.ts) — normally this never fires, since
+   * executeRun()'s own try/catch marks failure long before this. It exists
+   * for the one case that bypasses that entirely: a host that hard-kills
+   * the process mid-run (observed live on Vercel — its own function
+   * duration limit terminates the invocation without running any of our
+   * error handling), which would otherwise leave the row "running" forever
+   * and block every future run for that monitor via the concurrency guard.
+   */
+  staleRunTimeoutMs: num("STALE_RUN_TIMEOUT_MS", 120000),
 };
 
 /**

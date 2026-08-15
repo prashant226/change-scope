@@ -14,6 +14,7 @@
  */
 import { getStore } from "../storage/index.js";
 import { triggerRun } from "../orchestrator/trigger.js";
+import { reconcileStaleRun } from "../orchestrator/reconcileStaleRun.js";
 import { config } from "../utils/config.js";
 
 const store = getStore();
@@ -49,7 +50,7 @@ export async function runSchedulerTick(): Promise<{ due: number; triggered: numb
 
     for (const monitor of batch) {
       const recentRuns = await store.listRunsForMonitor(monitor.id);
-      const latest = recentRuns[0];
+      const latest = recentRuns[0] ? await reconcileStaleRun(recentRuns[0]) : undefined;
       if (latest && (latest.status === "queued" || latest.status === "running")) {
         continue; // a run for this monitor is already in flight — skip this tick
       }
