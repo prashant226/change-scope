@@ -69,17 +69,24 @@ export interface AnalyzedChange {
   needsReview: boolean;
 }
 
+/** "What state is the latest scan in?" — entirely separate from schedulingEnabled. */
+export type DerivedMonitorStatus = "pending" | "running" | "completed" | "failed";
+
 export interface MonitorRecord {
   id: string;
   url: string;
   title?: string;
-  status: "active" | "paused";
+  /** Automatic scheduled checks on/off — set only from Monitor → Settings, never implied by run status. */
+  schedulingEnabled: boolean;
   scheduleFrequency: "hourly" | "every_6_hours" | "daily" | "weekly";
   lastRunAt?: string;
+  /** Meaningless while schedulingEnabled is false — never display or act on it in that case. */
   nextRunAt?: string;
+  derivedStatus?: DerivedMonitorStatus;
   latestRunId?: string;
   latestRunStatus?: RunStatus;
   latestRunCompletedAt?: string;
+  latestReportType?: ReportType;
   latestMeaningfulChangeCount?: number;
 }
 

@@ -2,8 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { useRun } from "../hooks/useRun";
-import { AgentTrail } from "../components/AgentTrail";
-import { LiveExecutionTrace } from "../components/LiveExecutionTrace";
+import { AgentActivity } from "../components/AgentActivity";
 import { ChangeCard } from "../components/ChangeCard";
 import { ReportSummary } from "../components/ReportSummary";
 import { BaselineReport } from "../components/BaselineReport";
@@ -106,22 +105,16 @@ export function Overview() {
       </div>
 
       {run && (
-        <section className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6 items-start">
-          <div className="card p-5">
-            <h2 className="text-sm font-semibold text-ink mb-4">
-              {isRunning ? "Agent is running…" : "Agent Trail"}
-            </h2>
-            <AgentTrail logs={logs} live={Boolean(isRunning)} />
-            {monitorId && !isRunning && (
-              <Link
-                to={`/monitors/${monitorId}`}
-                className="inline-flex items-center gap-1 mt-4 text-sm font-medium text-primary hover:underline"
-              >
-                Open full monitor <ArrowRight className="h-3.5 w-3.5" />
-              </Link>
-            )}
-          </div>
-          <LiveExecutionTrace logs={logs} live={Boolean(isRunning)} />
+        <section className="card p-5 mb-6">
+          <AgentActivity logs={logs} live={Boolean(isRunning)} run={run} />
+          {monitorId && !isRunning && (
+            <Link
+              to={`/monitors/${monitorId}`}
+              className="inline-flex items-center gap-1 mt-4 text-sm font-medium text-primary hover:underline"
+            >
+              Open full monitor <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          )}
         </section>
       )}
 

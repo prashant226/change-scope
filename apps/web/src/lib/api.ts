@@ -35,10 +35,10 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ url }),
     }),
-  createMonitor: (url: string, scheduleFrequency: string) =>
+  createMonitor: (url: string) =>
     request<{ monitor: MonitorRecord; alreadyMonitored: boolean }>("/monitors", {
       method: "POST",
-      body: JSON.stringify({ url, scheduleFrequency }),
+      body: JSON.stringify({ url }),
     }),
   runMonitor: (monitorId: string) =>
     request<{ runId: string }>(`/monitors/${monitorId}/run`, { method: "POST" }),

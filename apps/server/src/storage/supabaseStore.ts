@@ -44,7 +44,7 @@ export class SupabaseStore implements StorageAdapter {
         url: input.url,
         normalized_url: input.normalizedUrl,
         title: input.title,
-        status: input.status,
+        scheduling_enabled: input.schedulingEnabled,
         schedule_frequency: input.scheduleFrequency,
         next_run_at: input.nextRunAt,
         last_run_at: input.lastRunAt,
@@ -77,7 +77,7 @@ export class SupabaseStore implements StorageAdapter {
       .from("monitored_urls")
       .update({
         ...(patch.title !== undefined && { title: patch.title }),
-        ...(patch.status !== undefined && { status: patch.status }),
+        ...(patch.schedulingEnabled !== undefined && { scheduling_enabled: patch.schedulingEnabled }),
         ...(patch.scheduleFrequency !== undefined && { schedule_frequency: patch.scheduleFrequency }),
         ...(patch.nextRunAt !== undefined && { next_run_at: patch.nextRunAt }),
         ...(patch.lastRunAt !== undefined && { last_run_at: patch.lastRunAt }),
@@ -95,7 +95,7 @@ export class SupabaseStore implements StorageAdapter {
     const { data, error } = await this.client
       .from("monitored_urls")
       .select("*")
-      .eq("status", "active")
+      .eq("scheduling_enabled", true)
       .or(`next_run_at.is.null,next_run_at.lte.${nowIso}`);
     if (error) throw error;
     return (data || []).map(rowToMonitor);
@@ -376,7 +376,7 @@ function rowToMonitor(row: any): MonitorRecord {
     url: row.url,
     normalizedUrl: row.normalized_url,
     title: row.title ?? undefined,
-    status: row.status,
+    schedulingEnabled: row.scheduling_enabled ?? false,
     scheduleFrequency: row.schedule_frequency,
     nextRunAt: row.next_run_at ?? undefined,
     lastRunAt: row.last_run_at ?? undefined,

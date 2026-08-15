@@ -10,10 +10,24 @@ import { buildReportHtml } from "../reports/reportHtml.js";
 import { renderHtmlToPdf } from "../reports/renderPdf.js";
 import { buildBaselineSummary } from "../reports/buildBaselineSummary.js";
 import { buildChangePreview } from "../reports/buildChangePreview.js";
-import type { ScheduleFrequency } from "../storage/types.js";
+import type { MonitorRecord, ScheduleFrequency } from "../storage/types.js";
 
 const router = Router();
 const store = getStore();
+
+// Express 4 does not catch a rejected promise thrown inside an async route
+// handler — it becomes an unhandled rejection at the process level, which
+// crashes the entire server (observed live: a single failing DB query took
+// the whole app down, not just that one request). Wrapping every handler
+// here routes the error into the existing error-handling middleware in
+// index.ts instead, so one bad request becomes a normal 500 response.
+for (const method of ["get", "post", "patch", "delete"] as const) {
+  const original = router[method].bind(router);
+  router[method] = ((path: string, handler: (req: unknown, res: unknown, next: unknown) => unknown) =>
+    original(path, (req: unknown, res: unknown, next: (err?: unknown) => void) => {
+      Promise.resolve(handler(req, res, next)).catch(next);
+    })) as typeof router[typeof method];
+}
 
 /** Fetches a monitor and 404s (never 403 — avoids confirming other users' monitor ids exist) unless it belongs to the caller. */
 async function getOwnedMonitor(userId: string, monitorId: string) {
@@ -23,8 +37,11 @@ async function getOwnedMonitor(userId: string, monitorId: string) {
 }
 
 // POST /api/monitors — create (or return existing) monitor for a URL.
+// Adding a monitor never implicitly enables scheduling (§5, §9, §62) — it's
+// created with scheduling off and no next-check time. Automatic checks are
+// only ever turned on explicitly, from Monitor → Settings.
 router.post("/monitors", async (req, res) => {
-  const { url, scheduleFrequency } = req.body as { url?: string; scheduleFrequency?: ScheduleFrequency };
+  const { url } = req.body as { url?: string };
   if (!url) return res.status(400).json({ error: "url is required" });
 
   const syntax = validateUrlSyntax(url);
@@ -37,14 +54,12 @@ router.post("/monitors", async (req, res) => {
     return res.status(200).json({ monitor: existing, alreadyMonitored: true });
   }
 
-  const frequency = scheduleFrequency || "every_6_hours";
   const monitor = await store.createMonitor({
     userId,
     url,
     normalizedUrl: normalized,
-    status: "active",
-    scheduleFrequency: frequency,
-    nextRunAt: computeNextRunAt(frequency),
+    schedulingEnabled: false,
+    scheduleFrequency: "every_6_hours",
   });
   return res.status(201).json({ monitor, alreadyMonitored: false });
 });
@@ -62,21 +77,40 @@ router.get("/monitors/:id", async (req, res) => {
   res.json({ monitor: summary });
 });
 
+// PATCH /api/monitors/:id — title, and/or the scheduler (Monitor → Settings
+// only, §11). Scheduling on/off and run status are unrelated concepts: this
+// route never touches the monitor's scan-state, only scheduling fields.
 router.patch("/monitors/:id", async (req, res) => {
   const monitor = await getOwnedMonitor(req.userId, req.params.id);
   if (!monitor) return res.status(404).json({ error: "Monitor not found" });
 
-  const patch = { ...req.body };
-  // Changing the frequency, or resuming a paused monitor, restarts the clock
-  // from now rather than waiting out whatever cadence was in effect before.
-  const frequencyChanged = patch.scheduleFrequency && patch.scheduleFrequency !== monitor.scheduleFrequency;
-  const resumed = patch.status === "active" && monitor.status === "paused";
-  if (frequencyChanged || resumed) {
-    patch.nextRunAt = computeNextRunAt(patch.scheduleFrequency || monitor.scheduleFrequency);
+  const body = req.body as { title?: string; schedulingEnabled?: boolean; scheduleFrequency?: ScheduleFrequency };
+  const patch: Partial<MonitorRecord> = {};
+  if (body.title !== undefined) patch.title = body.title;
+
+  if (body.schedulingEnabled === true) {
+    // Turning scheduling on (or changing frequency while it's already on)
+    // always restarts the clock from now, rather than reusing whatever
+    // next-check time happened to be sitting there from before.
+    const frequency = body.scheduleFrequency || monitor.scheduleFrequency;
+    patch.schedulingEnabled = true;
+    patch.scheduleFrequency = frequency;
+    patch.nextRunAt = computeNextRunAt(frequency);
+  } else if (body.schedulingEnabled === false) {
+    patch.schedulingEnabled = false;
+    // nextRunAt is intentionally left as-is — it's simply ignored (and never
+    // shown) while scheduling is off, so there's nothing to reset here.
+  } else if (body.scheduleFrequency !== undefined && monitor.schedulingEnabled) {
+    patch.scheduleFrequency = body.scheduleFrequency;
+    patch.nextRunAt = computeNextRunAt(body.scheduleFrequency);
   }
 
   const updated = await store.updateMonitor(req.params.id, patch);
-  res.json({ monitor: updated });
+  // Same enriched shape as the GET endpoints (derivedStatus, latest-run
+  // fields) — returning the bare record here would make the frontend's
+  // status badge revert to "pending" after every settings save.
+  const summary = await buildMonitorSummary(store, updated);
+  res.json({ monitor: summary });
 });
 
 // DELETE /api/monitors/:id — removes the monitor and everything tied to it
@@ -140,8 +174,7 @@ router.post("/runs", async (req, res) => {
   const alreadyMonitored = Boolean(monitor);
   if (!monitor) {
     monitor = await store.createMonitor({
-      userId, url, normalizedUrl: normalized, status: "active", scheduleFrequency: "every_6_hours",
-      nextRunAt: computeNextRunAt("every_6_hours"),
+      userId, url, normalizedUrl: normalized, schedulingEnabled: false, scheduleFrequency: "every_6_hours",
     });
   }
 

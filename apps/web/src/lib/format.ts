@@ -20,6 +20,11 @@ export function formatDateTime(iso?: string): string {
   });
 }
 
+/** "1 change" / "4 changes" / "0 changes" — never "1 change(s)". */
+export function pluralizeChanges(count: number): string {
+  return `${count} change${count === 1 ? "" : "s"}`;
+}
+
 export const FREQUENCY_LABELS: Record<string, string> = {
   hourly: "Every hour",
   every_6_hours: "Every 6 hours",

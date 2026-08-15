@@ -3,7 +3,6 @@ import type { AnalyzedChange } from "../types/change.js";
 import type { AgentLogEntry, RunErrorInfo, RunStatus, ReportType } from "../types/run.js";
 
 export type ScheduleFrequency = "hourly" | "every_6_hours" | "daily" | "weekly";
-export type MonitorStatus = "active" | "paused";
 
 export interface MonitorRecord {
   id: string;
@@ -11,7 +10,14 @@ export interface MonitorRecord {
   url: string;
   normalizedUrl: string;
   title?: string;
-  status: MonitorStatus;
+  /**
+   * Whether automatic scheduled checks are on for this monitor — completely
+   * separate from "what state is the latest scan in?" (that's derived from
+   * the latest run's status, see reports/monitorSummary.ts). Defaults off:
+   * adding a monitor never implicitly enables scheduling. `nextRunAt` is
+   * meaningless while this is false and must not be shown or acted on.
+   */
+  schedulingEnabled: boolean;
   scheduleFrequency: ScheduleFrequency;
   nextRunAt?: string;
   lastRunAt?: string;

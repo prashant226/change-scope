@@ -3,17 +3,22 @@ import { useNavigate } from "react-router-dom";
 import { ListChecks, Plus } from "lucide-react";
 import { api } from "../lib/api";
 import type { MonitorRecord } from "../types/api";
-import { MonitorStatusBadge, RunStatusBadge } from "../components/StatusBadge";
+import { MonitorStatusBadge } from "../components/StatusBadge";
 import { PageHeader } from "../components/PageHeader";
 import { EmptyState } from "../components/EmptyState";
-import { relativeTime, formatDateTime } from "../lib/format";
+import { relativeTime, formatDateTime, pluralizeChanges } from "../lib/format";
 import { CreateMonitorModal } from "../components/CreateMonitorModal";
+
+/** The "Changes" column: dash before there's a comparison to speak of, natural-language count once there is one. */
+function changesLabel(m: MonitorRecord): string {
+  if (m.latestReportType !== "comparison") return "—";
+  const count = m.latestMeaningfulChangeCount ?? 0;
+  return count === 0 ? "No meaningful changes" : pluralizeChanges(count);
+}
 
 export function Monitors() {
   const [monitors, setMonitors] = useState<MonitorRecord[] | null>(null);
   const [showCreate, setShowCreate] = useState(false);
-  const [runningId, setRunningId] = useState<string | null>(null);
-  const [runError, setRunError] = useState<string | null>(null);
   const navigate = useNavigate();
 
   const load = useCallback(() => {
@@ -23,19 +28,6 @@ export function Monitors() {
   useEffect(() => {
     load();
   }, [load]);
-
-  async function handleRunNow(id: string) {
-    setRunningId(id);
-    setRunError(null);
-    try {
-      await api.runMonitor(id);
-      navigate(`/monitors/${id}`);
-    } catch (err) {
-      setRunError(err instanceof Error ? err.message : "Could not start the run.");
-    } finally {
-      setRunningId(null);
-    }
-  }
 
   return (
     <div className="max-w-5xl mx-auto py-10 px-6">
@@ -49,8 +41,6 @@ export function Monitors() {
           </button>
         }
       />
-
-      {runError && <p className="text-sm text-high mb-3">{runError}</p>}
 
       <div className="card overflow-x-auto">
         {monitors?.length === 0 ? (
@@ -86,31 +76,23 @@ export function Monitors() {
                     </button>
                   </td>
                   <td className="px-5 py-3.5">
-                    <div className="flex flex-col gap-1 items-start">
-                      <MonitorStatusBadge status={m.status} />
-                      {m.latestRunStatus && <RunStatusBadge status={m.latestRunStatus} />}
-                    </div>
+                    <span title={m.derivedStatus === "pending" ? "This monitor has been added but has not completed its first successful scan." : undefined}>
+                      <MonitorStatusBadge status={m.derivedStatus || "pending"} />
+                    </span>
                   </td>
-                  <td className="px-5 py-3.5 text-ink">{relativeTime(m.latestRunCompletedAt || m.lastRunAt)}</td>
                   <td className="px-5 py-3.5 text-ink">
-                    {m.latestMeaningfulChangeCount !== undefined ? `${m.latestMeaningfulChangeCount} change(s)` : "—"}
+                    {m.derivedStatus === "pending" ? "Never" : relativeTime(m.latestRunCompletedAt || m.lastRunAt)}
                   </td>
+                  <td className="px-5 py-3.5 text-ink">{changesLabel(m)}</td>
                   <td className="px-5 py-3.5 text-muted">
-                    {m.status === "paused" ? "Paused" : formatDateTime(m.nextRunAt)}
+                    {m.schedulingEnabled ? formatDateTime(m.nextRunAt) : "Not scheduled"}
                   </td>
                   <td className="px-5 py-3.5 text-right whitespace-nowrap">
                     <button
                       onClick={() => navigate(`/monitors/${m.id}`)}
-                      className="text-sm font-medium text-primary hover:underline mr-3"
+                      className="text-sm font-medium text-primary hover:underline"
                     >
                       Open
-                    </button>
-                    <button
-                      onClick={() => handleRunNow(m.id)}
-                      disabled={runningId === m.id}
-                      className="text-sm font-medium text-primary hover:underline disabled:opacity-50"
-                    >
-                      {runningId === m.id ? "Starting…" : "Run now"}
                     </button>
                   </td>
                 </tr>

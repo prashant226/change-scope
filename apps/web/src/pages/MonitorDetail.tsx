@@ -3,8 +3,7 @@ import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import type { MonitorRecord, RunRecord, SnapshotSummary, AnalyzedChange } from "../types/api";
 import { api } from "../lib/api";
 import { useRun } from "../hooks/useRun";
-import { AgentTrail } from "../components/AgentTrail";
-import { LiveExecutionTrace } from "../components/LiveExecutionTrace";
+import { AgentActivity } from "../components/AgentActivity";
 import { ChangeCard } from "../components/ChangeCard";
 import { ReportSummary } from "../components/ReportSummary";
 import { BaselineReport } from "../components/BaselineReport";
@@ -16,7 +15,7 @@ import { relativeTime, formatDateTime, FREQUENCY_LABELS } from "../lib/format";
 import { downloadReportPdf } from "../lib/downloadPdf";
 import { ChevronDown, ChevronRight, Download, Trash2 } from "lucide-react";
 
-type Tab = "changes" | "history" | "trail" | "settings";
+type Tab = "changes" | "history" | "settings";
 type Changes = { meaningful: AnalyzedChange[]; cosmetic: AnalyzedChange[] };
 
 function monitorHostname(url: string): string {
@@ -45,7 +44,7 @@ export function MonitorDetail() {
   const [snapshots, setSnapshots] = useState<SnapshotSummary[]>([]);
   const [runs, setRuns] = useState<RunRecord[]>([]);
 
-  // The run currently shown in the Changes/Agent Trail tabs — either a
+  // The run currently shown in the Changes/Activity tabs — either a
   // specific one picked from History, or (by default) the latest finished run.
   const [selectedRun, setSelectedRun] = useState<RunRecord | null>(null);
   const [selectedChanges, setSelectedChanges] = useState<Changes | null>(null);
@@ -55,6 +54,13 @@ export function MonitorDetail() {
   const [showCosmetic, setShowCosmetic] = useState(false);
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
+
+  // Scheduler form state (Settings tab) — separate from monitor.schedulingEnabled
+  // until "Save schedule" is pressed, so toggling the switch doesn't fire a
+  // request per click.
+  const [schedulingDraft, setSchedulingDraft] = useState(false);
+  const [frequencyDraft, setFrequencyDraft] = useState("every_6_hours");
+  const [savingSchedule, setSavingSchedule] = useState(false);
 
   const { run: liveRun, logs: liveLogs, changes: liveChanges } = useRun(activeRunId);
 
@@ -75,6 +81,8 @@ export function MonitorDetail() {
     setMonitor(m);
     setSnapshots(s);
     setRuns(r);
+    setSchedulingDraft(m.schedulingEnabled);
+    setFrequencyDraft(m.scheduleFrequency);
 
     const targetRunId = viewingRunId || r.find((run) => run.status === "completed" || run.status === "partial" || run.status === "failed")?.id;
     if (targetRunId) await loadSelectedRun(targetRunId);
@@ -105,17 +113,18 @@ export function MonitorDetail() {
     setTab("changes");
   }
 
-  async function togglePause() {
-    if (!id || !monitor) return;
-    const nextStatus = monitor.status === "active" ? "paused" : "active";
-    const { monitor: updated } = await api.updateMonitor(id, { status: nextStatus });
-    setMonitor(updated);
-  }
-
-  async function changeFrequency(frequency: string) {
+  async function handleSaveSchedule() {
     if (!id) return;
-    const { monitor: updated } = await api.updateMonitor(id, { scheduleFrequency: frequency as MonitorRecord["scheduleFrequency"] });
-    setMonitor(updated);
+    setSavingSchedule(true);
+    try {
+      const { monitor: updated } = await api.updateMonitor(
+        id,
+        schedulingDraft ? { schedulingEnabled: true, scheduleFrequency: frequencyDraft as MonitorRecord["scheduleFrequency"] } : { schedulingEnabled: false },
+      );
+      setMonitor(updated);
+    } finally {
+      setSavingSchedule(false);
+    }
   }
 
   async function handleDownloadPdf(runId: string) {
@@ -141,35 +150,32 @@ export function MonitorDetail() {
   const displayLogs = activeRunId ? liveLogs : selectedLogs;
   const isBaseline = displayRun && displayRun.status !== "failed" && displayRun.reportType === "baseline";
   const isComparison = displayRun && displayRun.status !== "failed" && displayRun.reportType === "comparison";
+  const derivedStatus = isRunning ? "running" : monitor.derivedStatus || "pending";
+  const scheduleDirty = schedulingDraft !== monitor.schedulingEnabled || (schedulingDraft && frequencyDraft !== monitor.scheduleFrequency);
 
   return (
     <div className="max-w-4xl mx-auto py-10 px-6">
       <header className="mb-7">
         <div className="flex items-center gap-2.5 mb-1.5">
           <h1 className="text-[22px] font-semibold text-ink tracking-tight">{monitor.title || monitor.url}</h1>
-          <MonitorStatusBadge status={monitor.status} />
+          <MonitorStatusBadge status={derivedStatus} />
         </div>
         <p className="text-sm text-muted mb-4">{monitor.url}</p>
         <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-muted mb-5">
           <span>Last checked: {relativeTime(monitor.lastRunAt)}</span>
-          <span>
-            Next check: {monitor.status === "paused" ? "Paused" : formatDateTime(monitor.nextRunAt)}
-          </span>
-          <span>Frequency: {FREQUENCY_LABELS[monitor.scheduleFrequency] || monitor.scheduleFrequency}</span>
+          <span>Next check: {monitor.schedulingEnabled ? formatDateTime(monitor.nextRunAt) : "Not scheduled"}</span>
+          <span>Frequency: {monitor.schedulingEnabled ? FREQUENCY_LABELS[monitor.scheduleFrequency] || monitor.scheduleFrequency : "Manual only"}</span>
           <span>Snapshots: {snapshots.length}</span>
         </div>
         <div className="flex gap-2">
           <button onClick={handleRunNow} disabled={Boolean(isRunning)} className="btn-primary">
             {isRunning ? "Running…" : "Run now"}
           </button>
-          <button onClick={togglePause} className="btn-secondary">
-            {monitor.status === "active" ? "Pause" : "Resume"}
-          </button>
         </div>
       </header>
 
       <div className="flex gap-1 border-b border-border mb-6">
-        {(["changes", "history", "trail", "settings"] as Tab[]).map((t) => (
+        {(["changes", "history", "settings"] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -177,7 +183,7 @@ export function MonitorDetail() {
               tab === t ? "border-primary text-primary" : "border-transparent text-muted hover:text-ink"
             }`}
           >
-            {t === "trail" ? "Agent Trail" : t.charAt(0).toUpperCase() + t.slice(1)}
+            {t.charAt(0).toUpperCase() + t.slice(1)}
           </button>
         ))}
       </div>
@@ -185,12 +191,8 @@ export function MonitorDetail() {
       {tab === "changes" && (
         <section>
           {isRunning && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6 items-start">
-              <div className="card p-5">
-                <h2 className="text-sm font-semibold text-ink mb-4">Agent is running…</h2>
-                <AgentTrail logs={liveLogs} live />
-              </div>
-              <LiveExecutionTrace logs={liveLogs} live />
+            <div className="card p-5 mb-6">
+              <AgentActivity logs={liveLogs} live run={liveRun ?? undefined} />
             </div>
           )}
 
@@ -270,6 +272,12 @@ export function MonitorDetail() {
               )}
             </div>
           )}
+
+          {!isRunning && displayRun && (
+            <div className="card p-5 mt-6">
+              <AgentActivity logs={displayLogs} live={false} run={displayRun} />
+            </div>
+          )}
         </section>
       )}
 
@@ -277,53 +285,55 @@ export function MonitorDetail() {
         <SnapshotTimeline snapshots={snapshots} runs={runs} onSelectRun={handleSelectRun} selectedRunId={displayRun?.id} />
       )}
 
-      {tab === "trail" && (
-        <section className="space-y-4">
-          <div className="card p-5">
-            {displayLogs.length === 0 ? (
-              <p className="text-sm text-muted">No agent activity recorded yet.</p>
-            ) : (
-              <AgentTrail logs={displayLogs} live={Boolean(isRunning)} />
-            )}
-          </div>
-          {displayLogs.length > 0 && <LiveExecutionTrace logs={displayLogs} live={Boolean(isRunning)} />}
-        </section>
-      )}
-
       {tab === "settings" && (
         <section className="card p-5 max-w-md">
-          <label className="block text-xs font-medium text-muted mb-1" htmlFor="frequency">
-            Check frequency
-          </label>
-          <select
-            id="frequency"
-            className="w-full rounded-lg border border-border px-3 py-2.5 text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
-            value={monitor.scheduleFrequency}
-            onChange={(e) => changeFrequency(e.target.value)}
-          >
-            {FREQUENCIES.map((f) => (
-              <option key={f.value} value={f.value}>
-                {f.label}
-              </option>
-            ))}
-          </select>
+          <h3 className="text-sm font-semibold text-ink mb-1">Automatic checks</h3>
           <p className="text-xs text-muted mb-4">
-            Next check: {monitor.status === "paused" ? "Paused" : formatDateTime(monitor.nextRunAt)}. Checks run
-            automatically on this schedule — use "Run now" any time for an immediate check.
+            {schedulingDraft
+              ? "Automatic checks are on. Checks run automatically on the schedule below."
+              : "Automatic checks are off. This monitor will only run when you select “Run now”."}
           </p>
-          <button
-            onClick={togglePause}
-            className="btn-secondary"
-          >
-            {monitor.status === "active" ? "Pause monitor" : "Resume monitor"}
+
+          <label className="flex items-center gap-2.5 mb-4 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={schedulingDraft}
+              onChange={(e) => setSchedulingDraft(e.target.checked)}
+              className="h-4 w-4 rounded border-border text-primary focus:ring-primary/30"
+            />
+            <span className="text-sm text-ink">Enable scheduled checks</span>
+          </label>
+
+          {schedulingDraft && (
+            <>
+              <label className="block text-xs font-medium text-muted mb-1.5" htmlFor="frequency">
+                Check frequency
+              </label>
+              <select
+                id="frequency"
+                className="w-full rounded-lg border border-border px-3 py-2.5 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                value={frequencyDraft}
+                onChange={(e) => setFrequencyDraft(e.target.value)}
+              >
+                {FREQUENCIES.map((f) => (
+                  <option key={f.value} value={f.value}>
+                    {f.label}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-muted mb-4">
+                Next check: {monitor.schedulingEnabled && frequencyDraft === monitor.scheduleFrequency ? formatDateTime(monitor.nextRunAt) : "Calculated once saved"}
+              </p>
+            </>
+          )}
+
+          <button onClick={handleSaveSchedule} disabled={savingSchedule || !scheduleDirty} className="btn-primary disabled:opacity-50">
+            {savingSchedule ? "Saving…" : "Save schedule"}
           </button>
 
           <div className="mt-8 pt-6 border-t border-border">
-            <h3 className="text-sm font-semibold text-high mb-1">Danger zone</h3>
-            <p className="text-xs text-muted mb-3">
-              Permanently deletes this monitor and its entire history — every snapshot, run, and change
-              report. This cannot be undone.
-            </p>
+            <h3 className="text-sm font-semibold text-ink mb-1">Monitor management</h3>
+            <p className="text-xs text-muted mb-3">Manage this monitor and its stored scan history.</p>
             <button
               onClick={() => setShowDeleteConfirm(true)}
               className="flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-medium text-high transition-colors hover:bg-red-50"
@@ -331,6 +341,9 @@ export function MonitorDetail() {
               <Trash2 className="h-3.5 w-3.5" />
               Delete monitor
             </button>
+            <p className="text-xs text-muted mt-2">
+              Permanently removes this monitor, its snapshots, run history, and change reports.
+            </p>
           </div>
         </section>
       )}
@@ -338,7 +351,7 @@ export function MonitorDetail() {
       {showDeleteConfirm && (
         <ConfirmDialog
           title="Delete this monitor?"
-          description={`This permanently deletes "${monitor.title || monitor.url}" and its entire history — every snapshot, run, and change report. This cannot be undone.`}
+          description="This will permanently delete the monitor and its scan history. This action cannot be undone."
           confirmLabel="Delete monitor"
           requireTypedConfirmation={monitorHostname(monitor.url)}
           onConfirm={handleDeleteMonitor}

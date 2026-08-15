@@ -6,9 +6,13 @@ const RUN_STATUS_STYLES: Record<string, { label: string; className: string }> = 
   failed: { label: "Failed", className: "bg-red-50 text-high border-red-200" },
 };
 
-const MONITOR_STATUS_STYLES: Record<string, { label: string; className: string }> = {
-  active: { label: "Active", className: "bg-green-50 text-low border-green-200" },
-  paused: { label: "Paused", className: "bg-soft text-muted border-border" },
+// "What state is the latest scan in?" — pending/running/completed/failed.
+// Deliberately has nothing to do with whether scheduling is on (§1-2).
+const MONITOR_STATUS_STYLES: Record<string, { label: string; className: string; dot: string }> = {
+  pending: { label: "Pending", className: "bg-soft text-muted border-border", dot: "bg-muted" },
+  running: { label: "Running", className: "bg-blue-50 text-primary border-blue-200", dot: "bg-primary animate-pulse" },
+  completed: { label: "Completed", className: "bg-green-50 text-low border-green-200", dot: "bg-low" },
+  failed: { label: "Failed", className: "bg-red-50 text-high border-red-200", dot: "bg-high" },
 };
 
 export function RunStatusBadge({ status }: { status: string }) {
@@ -21,10 +25,10 @@ export function RunStatusBadge({ status }: { status: string }) {
 }
 
 export function MonitorStatusBadge({ status }: { status: string }) {
-  const style = MONITOR_STATUS_STYLES[status] || MONITOR_STATUS_STYLES.active;
+  const style = MONITOR_STATUS_STYLES[status] || MONITOR_STATUS_STYLES.pending;
   return (
     <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded border ${style.className}`}>
-      <span className={`h-1.5 w-1.5 rounded-full ${status === "active" ? "bg-low" : "bg-muted"}`} />
+      <span className={`h-1.5 w-1.5 rounded-full ${style.dot}`} />
       {style.label}
     </span>
   );

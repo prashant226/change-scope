@@ -12,9 +12,11 @@ import { groupChanges } from "../classifier/group.js";
 import { partitionChanges } from "../classifier/partition.js";
 import { buildCosmeticChanges } from "../classifier/buildCosmeticChanges.js";
 import { reasonAboutChanges } from "../ai/reason.js";
+import { isShopkartPage, mergeShopkartRelatedGroups, retrieveShopkartContext } from "../ai/shopkartContext.js";
 import { countGroups } from "../reports/countGroups.js";
 import { determineReportType } from "../reports/determineReportType.js";
 import { getStore } from "../storage/index.js";
+import type { MonitorRecord } from "../storage/types.js";
 import type { AgentLogEntry, RunStage } from "../types/run.js";
 import { config } from "../utils/config.js";
 import { computeNextRunAt } from "../utils/schedule.js";
@@ -23,6 +25,17 @@ const store = getStore();
 
 function contentHash(snapshotData: unknown): string {
   return createHash("sha1").update(JSON.stringify(snapshotData)).digest("hex");
+}
+
+/**
+ * Scheduling and run status are independent (see storage/types.ts). A run
+ * finishing (successfully, failed, or crashed) only advances `nextRunAt`
+ * when this monitor actually has automatic checks on — otherwise there is
+ * nothing to advance, since `nextRunAt` is ignored entirely while scheduling
+ * is off.
+ */
+function nextRunAtPatch(monitor: MonitorRecord): { nextRunAt?: string } {
+  return monitor.schedulingEnabled ? { nextRunAt: computeNextRunAt(monitor.scheduleFrequency) } : {};
 }
 
 /**
@@ -117,7 +130,7 @@ export async function executeRun(runId: string): Promise<void> {
       });
       await store.updateMonitor(monitor.id, {
         lastRunAt: new Date().toISOString(),
-        nextRunAt: computeNextRunAt(monitor.scheduleFrequency),
+        ...nextRunAtPatch(monitor),
       });
       return; // Failed capture NEVER becomes the new baseline (§7, §61).
     }
@@ -156,7 +169,7 @@ export async function executeRun(runId: string): Promise<void> {
       title: monitor.title || snapshotData.metadata.title,
       lastRunAt: new Date().toISOString(),
       lastSuccessfulSnapshotId: savedSnapshot.id,
-      nextRunAt: computeNextRunAt(monitor.scheduleFrequency),
+      ...nextRunAtPatch(monitor),
     });
 
     if (!previousSnapshot) {
@@ -198,31 +211,48 @@ export async function executeRun(runId: string): Promise<void> {
     const { candidates, cosmetic } = partitionChanges(rawChanges);
 
     await logger.log("grouping", "Grouping related changes", "Clustering low-level differences into higher-level events by section.", "in_progress");
-    const groups = groupChanges(candidates);
+    let groups = groupChanges(candidates);
+    // ShopKart-only contextual grouping (spec Part B §33) — merges groups that
+    // describe one related real-world event (e.g. availability + CTA) but
+    // landed in different DOM sections. No-op for every other monitor.
+    const isShopkart = isShopkartPage(`${monitor.url} ${snapshotData.metadata.title}`);
+    groups = mergeShopkartRelatedGroups(groups, isShopkart);
     await logger.log("grouping", "Grouping complete", `Formed ${groups.length} change group(s), plus ${cosmetic.length} cosmetic change(s) set aside.`, "completed", {
       candidateGroups: groups.length,
       cosmeticExcluded: cosmetic.length,
     });
 
-    await logger.log("ai_reasoning", "AI analysis started", "Interpreting ambiguous changes and their potential significance.", "in_progress", {
-      model: groups.length > 0 ? "gpt-5-mini" : undefined,
-      groupsSubmitted: groups.length,
-    });
-    const reasonResult = await reasonAboutChanges(groups, snapshotData.metadata.title, {
-      apiKey: config.openaiApiKey,
-      tokenBudget: config.aiContextTokenBudget,
-      retryCount: config.aiRetryCount,
-      retryDelayMs: config.aiRetryDelayMs,
-    });
-    await logger.log(
-      "ai_reasoning",
-      reasonResult.aiUnavailable ? "AI analysis unavailable" : "AI analysis complete",
-      reasonResult.aiUnavailable
-        ? "The AI significance step failed; showing deterministic facts without interpretation."
-        : "Significance and grouping explanations generated for each change.",
-      reasonResult.aiUnavailable ? "failed" : "completed",
-      { ...reasonResult.metrics },
+    if (groups.length === 0) {
+      await logger.log("ai_reasoning", "AI analysis skipped", "No candidate changes were found to interpret — nothing meaningful to reason about.", "completed");
+    } else {
+      await logger.log("ai_reasoning", "AI analysis started", "Interpreting ambiguous changes and their potential significance.", "in_progress", {
+        model: "gpt-5-mini",
+        groupsSubmitted: groups.length,
+      });
+    }
+    const shopkartContext = retrieveShopkartContext(groups, isShopkart);
+    const reasonResult = await reasonAboutChanges(
+      groups,
+      snapshotData.metadata.title,
+      {
+        apiKey: config.openaiApiKey,
+        tokenBudget: config.aiContextTokenBudget,
+        retryCount: config.aiRetryCount,
+        retryDelayMs: config.aiRetryDelayMs,
+      },
+      shopkartContext,
     );
+    if (groups.length > 0) {
+      await logger.log(
+        "ai_reasoning",
+        reasonResult.aiUnavailable ? "AI analysis unavailable" : "AI analysis complete",
+        reasonResult.aiUnavailable
+          ? "The AI significance step failed; showing deterministic facts without interpretation."
+          : "Significance and grouping explanations generated for each change.",
+        reasonResult.aiUnavailable ? "failed" : "completed",
+        { ...reasonResult.metrics },
+      );
+    }
 
     await logger.log("building_report", "Comparison report generated", "Converting analyzed changes into the final user-facing report.", "in_progress");
     const allChanges = [...reasonResult.changes, ...buildCosmeticChanges(cosmetic)];
@@ -257,7 +287,7 @@ export async function executeRun(runId: string): Promise<void> {
     // picked up again on every subsequent scheduler tick instead of backing off.
     await store.updateMonitor(monitor.id, {
       lastRunAt: new Date().toISOString(),
-      nextRunAt: computeNextRunAt(monitor.scheduleFrequency),
+      ...nextRunAtPatch(monitor),
     });
   }
 }

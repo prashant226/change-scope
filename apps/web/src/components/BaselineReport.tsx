@@ -126,11 +126,9 @@ export function BaselineReport({ run, monitor }: { run: RunRecord; monitor: Moni
           meaningful changes.
         </p>
         <p className="text-sm text-muted mt-2">
-          {monitor.status === "paused"
-            ? "This monitor is paused — run it manually any time to compare against this baseline."
-            : monitor.nextRunAt
-              ? `Next check: ${formatDateTime(monitor.nextRunAt)} (${FREQUENCY_LABELS[monitor.scheduleFrequency] || monitor.scheduleFrequency})`
-              : "Run the scan again whenever you want to compare the page."}
+          {monitor.schedulingEnabled && monitor.nextRunAt
+            ? `Next check: ${formatDateTime(monitor.nextRunAt)} (${FREQUENCY_LABELS[monitor.scheduleFrequency] || monitor.scheduleFrequency})`
+            : "Automatic checks are off — run it manually any time to compare against this baseline."}
         </p>
       </div>
     </div>

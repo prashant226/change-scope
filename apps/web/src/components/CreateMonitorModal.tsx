@@ -2,16 +2,8 @@ import { useState } from "react";
 import { X } from "lucide-react";
 import { api } from "../lib/api";
 
-const FREQUENCIES = [
-  { value: "hourly", label: "Every hour" },
-  { value: "every_6_hours", label: "Every 6 hours" },
-  { value: "daily", label: "Daily" },
-  { value: "weekly", label: "Weekly" },
-];
-
 export function CreateMonitorModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const [url, setUrl] = useState("");
-  const [frequency, setFrequency] = useState("every_6_hours");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -20,7 +12,7 @@ export function CreateMonitorModal({ onClose, onCreated }: { onClose: () => void
     setSubmitting(true);
     setError(null);
     try {
-      await api.createMonitor(url.trim(), frequency);
+      await api.createMonitor(url.trim());
       onCreated();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
@@ -48,27 +40,16 @@ export function CreateMonitorModal({ onClose, onCreated }: { onClose: () => void
         </label>
         <input
           id="monitor-url"
-          className="w-full rounded-lg border border-border px-3 py-2.5 text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+          className="w-full rounded-lg border border-border px-3 py-2.5 text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
           placeholder="https://example.com/page"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+          autoFocus
         />
-
-        <label className="block text-xs font-medium text-muted mb-1.5" htmlFor="monitor-frequency">
-          Check frequency
-        </label>
-        <select
-          id="monitor-frequency"
-          className="w-full rounded-lg border border-border px-3 py-2.5 text-sm mb-6 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
-          value={frequency}
-          onChange={(e) => setFrequency(e.target.value)}
-        >
-          {FREQUENCIES.map((f) => (
-            <option key={f.value} value={f.value}>
-              {f.label}
-            </option>
-          ))}
-        </select>
+        <p className="text-xs text-muted mb-5">
+          You can turn on automatic checks later from the monitor's settings — this just adds it.
+        </p>
 
         {error && <p className="text-sm text-high mb-3">{error}</p>}
 
@@ -77,7 +58,7 @@ export function CreateMonitorModal({ onClose, onCreated }: { onClose: () => void
             Cancel
           </button>
           <button onClick={handleSubmit} disabled={submitting || !url.trim()} className="btn-primary">
-            {submitting ? "Starting…" : "Start monitoring"}
+            {submitting ? "Adding…" : "Add monitor"}
           </button>
         </div>
       </div>

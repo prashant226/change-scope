@@ -45,7 +45,7 @@ export class MemoryStore implements StorageAdapter {
 
   async listDueMonitors(nowIso: string) {
     return [...this.monitors.values()].filter(
-      (m) => m.status === "active" && (!m.nextRunAt || m.nextRunAt <= nowIso),
+      (m) => m.schedulingEnabled && (!m.nextRunAt || m.nextRunAt <= nowIso),
     );
   }
 
