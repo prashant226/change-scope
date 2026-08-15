@@ -4,6 +4,7 @@ import { AlertTriangle, X } from "lucide-react";
 /** Reusable confirmation modal for destructive, irreversible actions — never a bare browser confirm(). */
 export function ConfirmDialog({
   title,
+  subtitle,
   description,
   confirmLabel,
   requireTypedConfirmation,
@@ -11,6 +12,8 @@ export function ConfirmDialog({
   onClose,
 }: {
   title: string;
+  /** Optional secondary line under the title (e.g. the monitor's URL) — plain muted text, not part of the title itself. */
+  subtitle?: string;
   description: string;
   confirmLabel: string;
   /** When set, the user must type this exact text before the confirm button enables — extra friction for the most destructive actions. */
@@ -47,8 +50,9 @@ export function ConfirmDialog({
           </button>
         </div>
 
-        <h2 className="text-[16px] font-semibold text-ink mb-1.5">{title}</h2>
-        <p className="text-sm text-muted mb-4 leading-relaxed">{description}</p>
+        <h2 className="text-[16px] font-semibold text-ink mb-0.5">{title}</h2>
+        {subtitle && <p className="text-xs text-muted mb-2 break-all">{subtitle}</p>}
+        <p className="text-sm text-muted mb-4 leading-relaxed whitespace-pre-line">{description}</p>
 
         {requireTypedConfirmation && (
           <div className="mb-4">
