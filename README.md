@@ -79,14 +79,14 @@ POST /api/runs ──► create/find monitor ──► create run row ──► 
                                                     ▼
                                           orchestrator.executeRun()
                                                     │
-      ┌─────────────────────────────────────────────┴──────────────────────────────────────────┐
-      │ validating_url → finding_previous_snapshot → opening_page/rendering/capturing           │
-      │   → building_snapshot → saving_snapshot → comparing → classifying → grouping             │
-      │   → ai_reasoning → building_report → completed/failed/partial                            │
-      │ (every stage appends an agent_log row with real metrics; the frontend polls               │
-      │  /runs/:id + /runs/:id/logs and renders them as one unified Agent Activity stream —        │
-      │  live while the run executes, the same stream afterward in the historical report)         │
-      └────────────────────────────────────────────────────────────────────────────────────────────┘
+      ┌─────────────────────────────────────────────┴───────────────────────────────────────┐
+      │ validating_url → finding_previous_snapshot → opening_page/rendering/capturing       │
+      │   → building_snapshot → saving_snapshot → comparing → classifying → grouping        │
+      │   → ai_reasoning → building_report → completed/failed/partial                       │
+      │ (every stage appends an agent_log row with real metrics; the frontend polls         │
+      │  /runs/:id + /runs/:id/logs and renders them as one unified Agent Activity stream — │
+      │  live while the run executes, the same stream afterward in the historical report)   │
+      └─────────────────────────────────────────────────────────────────────────────────────┘
                                                     │
                         ┌───────────────────────────┼────────────────────────────┐
                         ▼                           ▼                            ▼
