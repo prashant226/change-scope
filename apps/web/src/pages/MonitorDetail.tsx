@@ -27,10 +27,12 @@ function monitorHostname(url: string): string {
 }
 
 const FREQUENCIES = [
-  { value: "hourly", label: "Every hour" },
-  { value: "every_6_hours", label: "Every 6 hours" },
-  { value: "daily", label: "Daily" },
-  { value: "weekly", label: "Weekly" },
+  { value: "30m", label: "Every 30 minutes" },
+  { value: "1h", label: "Every hour" },
+  { value: "2h", label: "Every 2 hours" },
+  { value: "6h", label: "Every 6 hours" },
+  { value: "12h", label: "Every 12 hours" },
+  { value: "24h", label: "Daily" },
 ];
 
 export function MonitorDetail() {
@@ -54,12 +56,13 @@ export function MonitorDetail() {
   const [showCosmetic, setShowCosmetic] = useState(false);
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [runStartError, setRunStartError] = useState<string | null>(null);
 
   // Scheduler form state (Settings tab) — separate from monitor.schedulingEnabled
   // until "Save schedule" is pressed, so toggling the switch doesn't fire a
   // request per click.
   const [schedulingDraft, setSchedulingDraft] = useState(false);
-  const [frequencyDraft, setFrequencyDraft] = useState("every_6_hours");
+  const [frequencyDraft, setFrequencyDraft] = useState("6h");
   const [savingSchedule, setSavingSchedule] = useState(false);
 
   const { run: liveRun, logs: liveLogs, changes: liveChanges } = useRun(activeRunId);
@@ -102,9 +105,28 @@ export function MonitorDetail() {
 
   async function handleRunNow() {
     if (!id) return;
-    const { runId } = await api.runMonitor(id);
-    setActiveRunId(runId);
-    setTab("changes");
+    setRunStartError(null);
+    try {
+      const { runId } = await api.runMonitor(id);
+      setActiveRunId(runId);
+      setTab("changes");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Could not start the run.";
+      // A scan may already be running (started by the scheduler, or another
+      // tab) without this page knowing about it yet — rather than just
+      // showing an error, find and open that run so the user can watch it,
+      // per "let the user open the active run".
+      if (/already running/i.test(message)) {
+        const { runs: r } = await api.getHistory(id);
+        const active = r.find((run) => run.status === "queued" || run.status === "running");
+        if (active) {
+          setActiveRunId(active.id);
+          setTab("changes");
+          return;
+        }
+      }
+      setRunStartError(message);
+    }
   }
 
   function handleSelectRun(runId: string) {
@@ -186,6 +208,7 @@ export function MonitorDetail() {
             {isRunning ? "Running…" : "Run now"}
           </button>
         </div>
+        {runStartError && <p className="text-sm text-high mt-2">{runStartError}</p>}
       </header>
 
       <div className="flex gap-1 border-b border-border mb-6">

@@ -15,6 +15,15 @@ export async function triggerRun(
   monitorId: string,
   triggerType: "manual" | "scheduled",
 ): Promise<{ run: RunRecord } | { error: string }> {
+  // Single entry point for both manual and scheduled runs, so this guard
+  // covers every combination (manual-vs-manual, scheduled-vs-scheduled,
+  // manual-vs-scheduled) without each caller needing its own check (§29).
+  const recentRuns = await store.listRunsForMonitor(monitorId);
+  const latest = recentRuns[0];
+  if (latest && (latest.status === "queued" || latest.status === "running")) {
+    return { error: "A scan is already running for this monitor." };
+  }
+
   const gate = canStartRun(userId, monitorId);
   if (!gate.ok) return { error: gate.reason || "Could not start run." };
 

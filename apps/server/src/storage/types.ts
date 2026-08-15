@@ -2,7 +2,7 @@ import type { PageSnapshot } from "../types/snapshot.js";
 import type { AnalyzedChange } from "../types/change.js";
 import type { AgentLogEntry, RunErrorInfo, RunStatus, ReportType } from "../types/run.js";
 
-export type ScheduleFrequency = "hourly" | "every_6_hours" | "daily" | "weekly";
+export type ScheduleFrequency = "30m" | "1h" | "2h" | "6h" | "12h" | "24h";
 
 export interface MonitorRecord {
   id: string;

@@ -150,15 +150,22 @@ function useElapsed(startedAt: string | undefined, live: boolean): string {
   return formatDuration(Date.now() - new Date(startedAt).getTime());
 }
 
+/** "Scheduled scan" / "Manual scan" — secondary context on how this run started (§25, §27). */
+function TriggerTag({ run }: { run?: RunRecord }) {
+  if (!run) return null;
+  return <span className="text-xs text-muted">· {run.triggerType === "scheduled" ? "Scheduled scan" : "Manual scan"}</span>;
+}
+
 /** Compact header summary — running elapsed time, or a finished/failed completion line. */
 function ActivityHeader({ run, logs, live }: { run?: RunRecord; logs: AgentLogEntry[]; live: boolean }) {
   const elapsed = useElapsed(run?.startedAt ?? logs[0]?.timestamp, live);
 
   if (live) {
     return (
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         <h2 className="text-sm font-semibold text-ink">Agent Activity</h2>
         <span className="text-xs text-muted">Running · {elapsed}</span>
+        <TriggerTag run={run} />
       </div>
     );
   }
@@ -170,6 +177,7 @@ function ActivityHeader({ run, logs, live }: { run?: RunRecord; logs: AgentLogEn
         <span className="h-2 w-2 rounded-full bg-high shrink-0" aria-hidden />
         <h2 className="text-sm font-semibold text-high">Run failed</h2>
         {durationMs !== undefined && <span className="text-xs text-muted">{formatDuration(durationMs)}</span>}
+        <TriggerTag run={run} />
       </div>
     );
   }
@@ -181,6 +189,7 @@ function ActivityHeader({ run, logs, live }: { run?: RunRecord; logs: AgentLogEn
       <span className="h-2 w-2 rounded-full bg-low shrink-0" aria-hidden />
       <h2 className="text-sm font-semibold text-ink">Analysis complete</h2>
       {durationMs !== undefined && <span className="text-xs text-muted">{formatDuration(durationMs)}</span>}
+      <TriggerTag run={run} />
       {showCounts && (
         <span className="text-xs text-muted">
           · {run!.meaningfulChangeCount} meaningful change{run!.meaningfulChangeCount === 1 ? "" : "s"} ·{" "}

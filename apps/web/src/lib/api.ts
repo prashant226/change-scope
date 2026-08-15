@@ -6,6 +6,7 @@ import type {
   MonitorRecord,
   RunRecord,
   RunWithPreview,
+  ScheduleFrequency,
   SnapshotSummary,
 } from "../types/api";
 import { supabase } from "./supabaseClient";
@@ -35,10 +36,10 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ url }),
     }),
-  createMonitor: (url: string) =>
+  createMonitor: (url: string, schedulingEnabled: boolean, scheduleFrequency: ScheduleFrequency) =>
     request<{ monitor: MonitorRecord; alreadyMonitored: boolean }>("/monitors", {
       method: "POST",
-      body: JSON.stringify({ url }),
+      body: JSON.stringify({ url, schedulingEnabled, scheduleFrequency }),
     }),
   runMonitor: (monitorId: string) =>
     request<{ runId: string }>(`/monitors/${monitorId}/run`, { method: "POST" }),

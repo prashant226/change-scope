@@ -1,10 +1,12 @@
 import type { ScheduleFrequency } from "../storage/types.js";
 
 const FREQUENCY_MS: Record<ScheduleFrequency, number> = {
-  hourly: 60 * 60 * 1000,
-  every_6_hours: 6 * 60 * 60 * 1000,
-  daily: 24 * 60 * 60 * 1000,
-  weekly: 7 * 24 * 60 * 60 * 1000,
+  "30m": 30 * 60 * 1000,
+  "1h": 60 * 60 * 1000,
+  "2h": 2 * 60 * 60 * 1000,
+  "6h": 6 * 60 * 60 * 1000,
+  "12h": 12 * 60 * 60 * 1000,
+  "24h": 24 * 60 * 60 * 1000,
 };
 
 /** Computes the next scheduled check time from a given moment (default now). */

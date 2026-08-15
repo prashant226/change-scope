@@ -36,12 +36,19 @@ async function getOwnedMonitor(userId: string, monitorId: string) {
   return monitor;
 }
 
-// POST /api/monitors — create (or return existing) monitor for a URL.
-// Adding a monitor never implicitly enables scheduling (§5, §9, §62) — it's
-// created with scheduling off and no next-check time. Automatic checks are
-// only ever turned on explicitly, from Monitor → Settings.
+// POST /api/monitors — create (or return existing) monitor for a URL. The
+// Add Monitor modal now configures URL + check frequency in one step, so
+// schedulingEnabled/scheduleFrequency come from the caller — omitting them
+// falls back to scheduling off, for any other caller that just wants a
+// monitor record with no schedule. Never creates a duplicate: an existing
+// normalized URL is returned as-is (untouched) so the caller can decide
+// whether to update its schedule instead (see PATCH below).
 router.post("/monitors", async (req, res) => {
-  const { url } = req.body as { url?: string };
+  const { url, schedulingEnabled, scheduleFrequency } = req.body as {
+    url?: string;
+    schedulingEnabled?: boolean;
+    scheduleFrequency?: ScheduleFrequency;
+  };
   if (!url) return res.status(400).json({ error: "url is required" });
 
   const syntax = validateUrlSyntax(url);
@@ -54,12 +61,14 @@ router.post("/monitors", async (req, res) => {
     return res.status(200).json({ monitor: existing, alreadyMonitored: true });
   }
 
+  const frequency = scheduleFrequency || "6h";
   const monitor = await store.createMonitor({
     userId,
     url,
     normalizedUrl: normalized,
-    schedulingEnabled: false,
-    scheduleFrequency: "every_6_hours",
+    schedulingEnabled: Boolean(schedulingEnabled),
+    scheduleFrequency: frequency,
+    ...(schedulingEnabled ? { nextRunAt: computeNextRunAt(frequency) } : {}),
   });
   return res.status(201).json({ monitor, alreadyMonitored: false });
 });
@@ -174,7 +183,7 @@ router.post("/runs", async (req, res) => {
   const alreadyMonitored = Boolean(monitor);
   if (!monitor) {
     monitor = await store.createMonitor({
-      userId, url, normalizedUrl: normalized, schedulingEnabled: false, scheduleFrequency: "every_6_hours",
+      userId, url, normalizedUrl: normalized, schedulingEnabled: false, scheduleFrequency: "6h",
     });
   }
 

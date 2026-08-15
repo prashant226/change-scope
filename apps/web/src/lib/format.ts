@@ -21,8 +21,10 @@ export function formatDateTime(iso?: string): string {
 }
 
 export const FREQUENCY_LABELS: Record<string, string> = {
-  hourly: "Every hour",
-  every_6_hours: "Every 6 hours",
-  daily: "Daily",
-  weekly: "Weekly",
+  "30m": "Every 30 minutes",
+  "1h": "Every hour",
+  "2h": "Every 2 hours",
+  "6h": "Every 6 hours",
+  "12h": "Every 12 hours",
+  "24h": "Daily",
 };

@@ -7,7 +7,7 @@ describe("buildMonitorSummary — derivedStatus", () => {
     const store = new MemoryStore();
     const monitor = await store.createMonitor({
       userId: "u1", url: "https://example.com", normalizedUrl: "https://example.com",
-      schedulingEnabled: false, scheduleFrequency: "daily",
+      schedulingEnabled: false, scheduleFrequency: "24h",
     });
     const summary = await buildMonitorSummary(store, monitor);
     expect(summary.derivedStatus).toBe("pending");
@@ -17,7 +17,7 @@ describe("buildMonitorSummary — derivedStatus", () => {
     const store = new MemoryStore();
     const monitor = await store.createMonitor({
       userId: "u1", url: "https://example.com", normalizedUrl: "https://example.com",
-      schedulingEnabled: false, scheduleFrequency: "daily",
+      schedulingEnabled: false, scheduleFrequency: "24h",
     });
     await store.createRun({
       monitorId: monitor.id, userId: "u1", status: "running", triggerType: "manual",
@@ -31,7 +31,7 @@ describe("buildMonitorSummary — derivedStatus", () => {
     const store = new MemoryStore();
     const monitor = await store.createMonitor({
       userId: "u1", url: "https://example.com", normalizedUrl: "https://example.com",
-      schedulingEnabled: false, scheduleFrequency: "daily",
+      schedulingEnabled: false, scheduleFrequency: "24h",
     });
     await store.createRun({
       monitorId: monitor.id, userId: "u1", status: "partial", triggerType: "manual",
@@ -45,7 +45,7 @@ describe("buildMonitorSummary — derivedStatus", () => {
     const store = new MemoryStore();
     const monitor = await store.createMonitor({
       userId: "u1", url: "https://example.com", normalizedUrl: "https://example.com",
-      schedulingEnabled: false, scheduleFrequency: "daily",
+      schedulingEnabled: false, scheduleFrequency: "24h",
     });
     await store.createRun({
       monitorId: monitor.id, userId: "u1", status: "failed", triggerType: "manual",

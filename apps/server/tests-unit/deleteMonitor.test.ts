@@ -11,7 +11,7 @@ describe("MemoryStore.deleteMonitor", () => {
       url: "https://example.com",
       normalizedUrl: "https://example.com",
       schedulingEnabled: false,
-      scheduleFrequency: "daily",
+      scheduleFrequency: "24h",
     });
 
     const run = await store.createRun({
@@ -87,11 +87,11 @@ describe("MemoryStore.deleteMonitor", () => {
 
     const monitorA = await store.createMonitor({
       userId, url: "https://a.example.com", normalizedUrl: "https://a.example.com",
-      schedulingEnabled: false, scheduleFrequency: "daily",
+      schedulingEnabled: false, scheduleFrequency: "24h",
     });
     const monitorB = await store.createMonitor({
       userId, url: "https://b.example.com", normalizedUrl: "https://b.example.com",
-      schedulingEnabled: false, scheduleFrequency: "daily",
+      schedulingEnabled: false, scheduleFrequency: "24h",
     });
 
     await store.deleteMonitor(monitorA.id);
