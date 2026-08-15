@@ -127,6 +127,20 @@ export function MonitorDetail() {
     }
   }
 
+  // One-click shortcut for "turn scheduling off right now" — same effect as
+  // unchecking the box and hitting Save schedule, without the extra step.
+  async function handlePauseNow() {
+    if (!id) return;
+    setSavingSchedule(true);
+    try {
+      const { monitor: updated } = await api.updateMonitor(id, { schedulingEnabled: false });
+      setMonitor(updated);
+      setSchedulingDraft(false);
+    } finally {
+      setSavingSchedule(false);
+    }
+  }
+
   async function handleDownloadPdf(runId: string) {
     setDownloadingPdf(true);
     try {
@@ -294,15 +308,26 @@ export function MonitorDetail() {
               : "Automatic checks are off. This monitor will only run when you select “Run now”."}
           </p>
 
-          <label className="flex items-center gap-2.5 mb-4 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={schedulingDraft}
-              onChange={(e) => setSchedulingDraft(e.target.checked)}
-              className="h-4 w-4 rounded border-border text-primary focus:ring-primary/30"
-            />
-            <span className="text-sm text-ink">Enable scheduled checks</span>
-          </label>
+          <div className="flex items-center justify-between mb-4">
+            <label className="flex items-center gap-2.5 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={schedulingDraft}
+                onChange={(e) => setSchedulingDraft(e.target.checked)}
+                className="h-4 w-4 rounded border-border text-primary focus:ring-primary/30"
+              />
+              <span className="text-sm text-ink">Enable scheduled checks</span>
+            </label>
+            {monitor.schedulingEnabled && (
+              <button
+                onClick={handlePauseNow}
+                disabled={savingSchedule}
+                className="text-sm font-medium text-muted hover:text-ink disabled:opacity-50"
+              >
+                Pause
+              </button>
+            )}
+          </div>
 
           {schedulingDraft && (
             <>

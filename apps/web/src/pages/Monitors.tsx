@@ -6,14 +6,16 @@ import type { MonitorRecord } from "../types/api";
 import { MonitorStatusBadge } from "../components/StatusBadge";
 import { PageHeader } from "../components/PageHeader";
 import { EmptyState } from "../components/EmptyState";
-import { relativeTime, formatDateTime, pluralizeChanges } from "../lib/format";
+import { relativeTime, formatDateTime } from "../lib/format";
 import { CreateMonitorModal } from "../components/CreateMonitorModal";
 
-/** The "Changes" column: dash before there's a comparison to speak of, natural-language count once there is one. */
+/** The "Changes" column: dash before there's a comparison to speak of. The
+ * column header already says "Changes", so a nonzero count is shown bare
+ * (1, 2, …) rather than repeating the word. */
 function changesLabel(m: MonitorRecord): string {
   if (m.latestReportType !== "comparison") return "—";
   const count = m.latestMeaningfulChangeCount ?? 0;
-  return count === 0 ? "No meaningful changes" : pluralizeChanges(count);
+  return count === 0 ? "No changes" : String(count);
 }
 
 export function Monitors() {
