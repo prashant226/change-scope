@@ -69,13 +69,13 @@ POST /api/runs -> create/find monitor -> create run row -> respond with runId
                                           orchestrator.executeRun()
                                                     |
       +-----------------------------------------------------------------------------------+
-      | validating_url -> finding_previous_snapshot -> opening_page/rendering/capturing    |
-      |   -> building_snapshot -> saving_snapshot -> comparing -> classifying -> grouping   |
-      |   -> ai_reasoning -> building_report -> completed/failed/partial                    |
-      |                                                                                     |
-      | Every stage appends an agent_log row with real metrics. The frontend polls          |
-      | /runs/:id and /runs/:id/logs and renders them as one unified Agent Activity         |
-      | stream, live while the run executes and preserved afterward in the report.          |
+      | validating_url -> finding_previous_snapshot -> opening_page/rendering/capturing   |
+      |   -> building_snapshot -> saving_snapshot -> comparing -> classifying -> grouping |
+      |   -> ai_reasoning -> building_report -> completed/failed/partial                  |
+      |                                                                                   |
+      | Every stage appends an agent_log row with real metrics. The frontend polls        |
+      | /runs/:id and /runs/:id/logs and renders them as one unified Agent Activity       |
+      | stream, live while the run executes and preserved afterward in the report.        |
       +-----------------------------------------------------------------------------------+
                                                     |
                         +---------------------------+---------------------------+
